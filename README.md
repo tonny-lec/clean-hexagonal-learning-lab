@@ -58,6 +58,7 @@ Clean Architecture と Hexagonal Architecture を、**概念だけでなく、�
 - `docs/07-value-objects-queries-domain-events-and-persistence.md`
 - `docs/08-how-to-think-and-explain-like-a-designer.md`
 - `docs/09-oral-exam-checklist.md`
+- `docs/10-priority-roadmap-clean-hexagonal-and-ddd.md`
 
 ### 2. コードを読む
 - `src/domain/`
