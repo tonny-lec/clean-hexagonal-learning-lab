@@ -1,17 +1,14 @@
-import type { PaymentGatewayPort } from '../../application/ports/payment-gateway-port.js';
+import type { PaymentGatewayPort, PaymentReceipt } from '../../application/ports/payment-gateway-port.js';
+import type { Money } from '../../domain/money.js';
 
 export class ConsolePaymentGateway implements PaymentGatewayPort {
-  async charge(customerId: string, amount: number): Promise<{
-    customerId: string;
-    amount: number;
-    confirmationId: string;
-  }> {
-    const confirmationId = `pay-${customerId}-${amount}`;
-    console.log(`Charging ${customerId} for ${amount}. Confirmation: ${confirmationId}`);
+  async charge(customerId: string, amount: Money, requestId?: string): Promise<PaymentReceipt> {
+    const confirmationId = requestId ? `pay-${requestId}` : `pay-${customerId}-${amount.amountInMinor}`;
+    console.log(`Charging ${customerId} for ${amount.amountInMinor} ${amount.currency}. Confirmation: ${confirmationId}`);
 
     return {
       customerId,
-      amount,
+      amount: amount.toJSON(),
       confirmationId,
     };
   }

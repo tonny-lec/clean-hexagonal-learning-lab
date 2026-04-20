@@ -1,31 +1,69 @@
+import type { Money } from './money.js';
+import { DomainValidationError } from './errors.js';
+
+export type OrderPlacedEvent = {
+  type: 'order.placed';
+  orderId: string;
+  customerId: string;
+  totalAmount: {
+    amountInMinor: number;
+    currency: string;
+  };
+};
+
 export type OrderLine = {
   sku: string;
   quantity: number;
-  unitPrice: number;
+  unitPrice: Money;
 };
 
 export class Order {
-  constructor(
+  private readonly domainEvents: OrderPlacedEvent[];
+
+  private constructor(
     public readonly id: string,
     public readonly customerId: string,
     public readonly lines: OrderLine[],
+    domainEvents: OrderPlacedEvent[] = [],
   ) {
     if (lines.length === 0) {
-      throw new Error('An order must contain at least one item.');
+      throw new DomainValidationError('An order must contain at least one item.');
     }
 
     for (const line of lines) {
       if (line.quantity <= 0) {
-        throw new Error('Order line quantity must be greater than zero.');
-      }
-
-      if (line.unitPrice < 0) {
-        throw new Error('Order line unit price must not be negative.');
+        throw new DomainValidationError('Order line quantity must be greater than zero.');
       }
     }
+
+    this.domainEvents = domainEvents;
   }
 
-  totalAmount(): number {
-    return this.lines.reduce((total, line) => total + line.quantity * line.unitPrice, 0);
+  static place(id: string, customerId: string, lines: OrderLine[]): Order {
+    const order = new Order(id, customerId, lines);
+    return new Order(order.id, order.customerId, order.lines, [
+      {
+        type: 'order.placed',
+        orderId: order.id,
+        customerId: order.customerId,
+        totalAmount: order.totalAmount().toJSON(),
+      },
+    ]);
+  }
+
+  static rehydrate(id: string, customerId: string, lines: OrderLine[]): Order {
+    return new Order(id, customerId, lines);
+  }
+
+  totalAmount(): Money {
+    return this.lines
+      .map((line) => line.unitPrice.multiply(line.quantity))
+      .reduce((total, lineAmount) => total.add(lineAmount));
+  }
+
+  pullDomainEvents(): OrderPlacedEvent[] {
+    const events = [...this.domainEvents];
+    this.domainEvents.length = 0;
+    return events;
   }
 }
