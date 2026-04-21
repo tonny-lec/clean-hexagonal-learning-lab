@@ -4,12 +4,13 @@ import {
   ExternalServiceError,
   InvalidRequestApplicationError,
 } from '../errors/application-error.js';
-import type { DomainEventPublisherPort } from '../ports/domain-event-publisher-port.js';
+import type { AuditLogPort } from '../ports/audit-log-port.js';
 import type { OrderRepositoryPort } from '../ports/order-repository-port.js';
 import type { OutboxPort } from '../ports/outbox-port.js';
 import type { PaymentGatewayPort } from '../ports/payment-gateway-port.js';
 import type { ProductCatalogPort } from '../ports/product-catalog-port.js';
 import type { UnitOfWorkPort } from '../ports/unit-of-work-port.js';
+import type { ObservabilityPort } from '../ports/observability-port.js';
 import type { OrderAuthorizationPolicy } from '../policies/order-authorization-policy.js';
 import { DomainValidationError } from '../../domain/errors.js';
 import { Order } from '../../domain/order.js';
@@ -28,10 +29,11 @@ export type PlaceOrderDependencies = {
   catalog: ProductCatalogPort;
   orderRepository: OrderRepositoryPort;
   paymentGateway: PaymentGatewayPort;
-  eventPublisher?: DomainEventPublisherPort;
   outbox: OutboxPort;
   unitOfWork: UnitOfWorkPort;
   authorizationPolicy?: OrderAuthorizationPolicy;
+  observability?: ObservabilityPort;
+  auditLog?: AuditLogPort;
   idGenerator: () => string;
 };
 
@@ -43,6 +45,11 @@ export async function placeOrder(
     throw new InvalidRequestApplicationError('customerId is required.');
   }
 
+  await dependencies.observability?.record('order.place.started', {
+    customerId: command.customerId,
+    idempotencyKey: command.idempotencyKey ?? null,
+  });
+
   if (command.idempotencyKey && dependencies.orderRepository.findByIdempotencyKey) {
     const existingRecord = await dependencies.orderRepository.findByIdempotencyKey(command.idempotencyKey);
     if (existingRecord) {
@@ -50,6 +57,11 @@ export async function placeOrder(
         actor: command.actor,
         customerId: existingRecord.order.customerId,
         totalAmount: existingRecord.order.totalAmount(),
+      });
+
+      await dependencies.observability?.record('order.place.completed', {
+        orderId: existingRecord.order.id,
+        reused: true,
       });
 
       return {
@@ -104,12 +116,31 @@ export async function placeOrder(
       await dependencies.outbox.save(domainEvents, transaction);
     });
 
+    await dependencies.auditLog?.append({
+      action: 'order-placed',
+      aggregateId: order.id,
+      payload: {
+        customerId: order.customerId,
+        paymentConfirmationId,
+      },
+      occurredAt: new Date().toISOString(),
+    });
+    await dependencies.observability?.record('order.place.completed', {
+      orderId: order.id,
+      reused: false,
+    });
+
     return {
       orderId: order.id,
       totalAmount: totalAmount.toJSON(),
       paymentConfirmationId,
     };
   } catch (error) {
+    await dependencies.observability?.record('order.place.failed', {
+      customerId: command.customerId,
+      error: error instanceof Error ? error.message : 'unknown-error',
+    });
+
     if (error instanceof DomainValidationError || error instanceof InvalidRequestApplicationError) {
       throw new InvalidRequestApplicationError(error.message, { cause: error });
     }

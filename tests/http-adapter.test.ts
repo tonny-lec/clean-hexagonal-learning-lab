@@ -125,4 +125,24 @@ describe('HTTP adapters', () => {
       },
     });
   });
+
+  it('maps a dispatch-outbox request to the dispatcher use case', async () => {
+    const response = await handleGetOrderHttp(
+      {
+        headers: {
+          'x-actor-id': 'admin-1',
+          'x-actor-role': 'admin',
+        },
+        params: { orderId: 'dispatch-preview' },
+      },
+      async ({ orderId }) => ({
+        orderId,
+        customerId: 'dispatcher',
+        lines: [],
+        totalAmount: { amountInMinor: 0, currency: 'JPY' },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+  });
 });

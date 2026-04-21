@@ -1,12 +1,19 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import type { IntegrationEventPublisherPort } from '../../application/ports/integration-event-publisher-port.js';
+import type { OrderReadModelPort } from '../../application/ports/order-read-model-port.js';
+import { dispatchOutbox } from '../../application/use-cases/dispatch-outbox.js';
 import { getOrderSummary } from '../../application/use-cases/get-order-summary.js';
 import type { PlaceOrderDependencies } from '../../application/use-cases/place-order.js';
 import { placeOrder } from '../../application/use-cases/place-order.js';
+import { handleDispatchOutboxHttp } from './dispatch-outbox-http-handler.js';
 import { handleGetOrderHttp } from './get-order-http-handler.js';
 import { handlePlaceOrderHttp } from './place-order-http-handler.js';
 
-export function createDemoHttpServer(dependencies: PlaceOrderDependencies) {
+export function createDemoHttpServer(dependencies: PlaceOrderDependencies & {
+  orderReadModel: OrderReadModelPort;
+  integrationEventPublisher: IntegrationEventPublisherPort;
+}) {
   return createServer(async (req, res) => {
     const url = req.url ?? '/';
     const headers = normalizeHeaders(req.headers);
@@ -19,11 +26,26 @@ export function createDemoHttpServer(dependencies: PlaceOrderDependencies) {
       return;
     }
 
+    if (req.method === 'POST' && url === '/dispatch-outbox') {
+      const response = await handleDispatchOutboxHttp((command) =>
+        dispatchOutbox(command, {
+          outbox: dependencies.outbox,
+          integrationEventPublisher: dependencies.integrationEventPublisher,
+          orderReadModel: dependencies.orderReadModel,
+          observability: dependencies.observability,
+          auditLog: dependencies.auditLog,
+        }),
+      );
+      res.writeHead(response.status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(response.body));
+      return;
+    }
+
     if (req.method === 'GET' && url.startsWith('/orders/')) {
       const orderId = url.replace('/orders/', '');
       const response = await handleGetOrderHttp({ params: { orderId }, headers }, (query) =>
         getOrderSummary(query, {
-          orderRepository: dependencies.orderRepository,
+          orderReadModel: dependencies.orderReadModel,
           authorizationPolicy: dependencies.authorizationPolicy,
         }),
       );
@@ -37,7 +59,13 @@ export function createDemoHttpServer(dependencies: PlaceOrderDependencies) {
   });
 }
 
-export async function startDemoHttpServer(dependencies: PlaceOrderDependencies, port = 3000): Promise<string> {
+export async function startDemoHttpServer(
+  dependencies: PlaceOrderDependencies & {
+    orderReadModel: OrderReadModelPort;
+    integrationEventPublisher: IntegrationEventPublisherPort;
+  },
+  port = 3000,
+): Promise<string> {
   const server = createDemoHttpServer(dependencies);
 
   await new Promise<void>((resolve) => {

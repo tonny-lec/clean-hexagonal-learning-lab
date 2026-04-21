@@ -251,11 +251,32 @@
 - 入口ごとに認可ロジックを複製しないため
 - high-value order のように業務データが必要な判定があると説明できるか
 
+### Q35. outbox dispatcher は何の責務を持ちますか？
+**見たいポイント**
+- pending message を運ぶ責務
+- business transaction の外で delivery を進めること
+- mark-as-published / retry の入口だと説明できるか
+
+### Q36. domain event と integration event は何が違いますか？
+**見たいポイント**
+- domain 内の意味と外部共有契約の違い
+- versioning / schema evolution の論点に触れられるか
+
+### Q37. なぜ `getOrderSummary` を read model に寄せる価値があるのですか？
+**見たいポイント**
+- query side を write model から分ける意味
+- eventual consistency を受け入れる代わりに読みやすさを得る構造だと言えるか
+
+### Q38. observability と audit log は何が違いますか？
+**見たいポイント**
+- 運用観測と履歴証跡の違い
+- 同じログっぽく見えても目的が違うと説明できるか
+
 ---
 
 ## Part 6. 説明の深さを測る応用問題
 
-### Q35. この repo でまだ「本番向けには足りない」ところはどこですか？
+### Q39. この repo でまだ「本番向けには足りない」ところはどこですか？
 **見たいポイント**
 - saga
 - retry / timeout
@@ -265,7 +286,7 @@
 - audit log
 などを挙げられるか
 
-### Q36. この repo を次に1段階進化させるなら何を追加しますか？ なぜですか？
+### Q40. この repo を次に1段階進化させるなら何を追加しますか？ なぜですか？
 **見たいポイント**
 - outbox dispatcher
 - 複数 payment adapter
@@ -274,31 +295,31 @@
 - policy composition
 など、目的付きで答えられるか
 
-### Q37. 「Controller に業務ルールが入る」と何がつらいのですか？
+### Q41. 「Controller に業務ルールが入る」と何がつらいのですか？
 **見たいポイント**
 - 再利用できない
 - テストしづらい
 - 入口ごとにロジックが散る
 - 変更影響が広がる
 
-### Q38. Ubiquitous Language はなぜ DDD の出発点なのですか？
+### Q42. Ubiquitous Language はなぜ DDD の出発点なのですか？
 **見たいポイント**
 - docs と code と会話の意味を揃えるためだと言えるか
 - `Order`, `Payment`, `Money` を混同しない意義を説明できるか
 
-### Q39. なぜ `Order` を aggregate root と見なすのですか？
+### Q43. なぜ `Order` を aggregate root と見なすのですか？
 **見たいポイント**
 - 一貫性境界
 - repository が aggregate 単位である理由
 - `OrderLine` は内部要素であり、`Payment` は外側 detail だと言えるか
 
-### Q40. 「なんでも interface 化する」のはなぜダメですか？
+### Q44. 「なんでも interface 化する」のはなぜダメですか？
 **見たいポイント**
 - 変わらないものまで抽象化すると儀式になる
 - 学習コストや複雑さが上がる
 - 境界は痛いところから切るべきだと理解しているか
 
-### Q41. 「この案件はフル採用すべきではない」と説明してください
+### Q45. 「この案件はフル採用すべきではない」と説明してください
 **見たいポイント**
 - 非採用や部分採用の理由を言えるか
 - 設計は目的でなく手段だと理解しているか

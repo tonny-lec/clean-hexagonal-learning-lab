@@ -29,6 +29,7 @@ describe('PostgresOutbox', () => {
         type: 'order.placed',
         orderId: 'order-1',
         customerId: 'customer-1',
+        lines: [{ sku: 'BOOK', quantity: 2, unitPrice: { amountInMinor: 1200, currency: 'JPY' } }],
         totalAmount: { amountInMinor: 2650, currency: 'JPY' },
       },
     ]);

@@ -12,4 +12,6 @@ export type OutboxMessage = {
 
 export interface OutboxPort {
   save(events: OrderPlacedEvent[], transaction?: TransactionContext): Promise<void>;
+  listPending(batchSize?: number): Promise<OutboxMessage[]>;
+  markAsPublished(ids: string[]): Promise<void>;
 }

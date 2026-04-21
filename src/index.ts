@@ -1,6 +1,7 @@
 import { runPlaceOrderBatch } from './adapters/batch/place-order-batch.js';
 import { runGetOrderCli, runPlaceOrderCli } from './adapters/cli/order-cli.js';
 import { startDemoHttpServer } from './adapters/http/create-demo-http-server.js';
+import { dispatchOutbox } from './application/use-cases/dispatch-outbox.js';
 import { getOrderSummary } from './application/use-cases/get-order-summary.js';
 import { placeOrder } from './application/use-cases/place-order.js';
 import { createDemoDependencies } from './composition-root.js';
@@ -15,6 +16,23 @@ const adminActor = {
 
 if (mode === 'http') {
   console.log(await startDemoHttpServer(dependencies));
+} else if (mode === 'dispatch') {
+  console.log(
+    JSON.stringify(
+      await dispatchOutbox(
+        { batchSize: 100 },
+        {
+          outbox: dependencies.outbox,
+          integrationEventPublisher: dependencies.integrationEventPublisher,
+          orderReadModel: dependencies.orderReadModel,
+          observability: dependencies.observability,
+          auditLog: dependencies.auditLog,
+        },
+      ),
+      null,
+      2,
+    ),
+  );
 } else if (mode === 'batch') {
   const results = await runPlaceOrderBatch(
     [
@@ -45,13 +63,23 @@ if (mode === 'http') {
     },
     dependencies,
   );
+  await dispatchOutbox(
+    { batchSize: 100 },
+    {
+      outbox: dependencies.outbox,
+      integrationEventPublisher: dependencies.integrationEventPublisher,
+      orderReadModel: dependencies.orderReadModel,
+      observability: dependencies.observability,
+      auditLog: dependencies.auditLog,
+    },
+  );
   console.log(`Created ${placed.orderId}`);
   console.log(
     await runGetOrderCli(placed.orderId, (query) =>
       getOrderSummary(
         { ...query, actor: adminActor },
         {
-          orderRepository: dependencies.orderRepository,
+          orderReadModel: dependencies.orderReadModel,
           authorizationPolicy: dependencies.authorizationPolicy,
         },
       ),

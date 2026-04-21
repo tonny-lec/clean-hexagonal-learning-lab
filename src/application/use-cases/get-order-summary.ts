@@ -4,7 +4,7 @@ import {
   AuthorizationApplicationError,
   NotFoundApplicationError,
 } from '../errors/application-error.js';
-import type { OrderRepositoryPort } from '../ports/order-repository-port.js';
+import type { OrderReadModelPort } from '../ports/order-read-model-port.js';
 import type { OrderAuthorizationPolicy } from '../policies/order-authorization-policy.js';
 
 export type GetOrderSummaryQuery = {
@@ -14,16 +14,16 @@ export type GetOrderSummaryQuery = {
 
 export async function getOrderSummary(
   query: GetOrderSummaryQuery,
-  dependencies: { orderRepository: OrderRepositoryPort; authorizationPolicy?: OrderAuthorizationPolicy },
+  dependencies: { orderReadModel: OrderReadModelPort; authorizationPolicy?: OrderAuthorizationPolicy },
 ): Promise<OrderSummaryDto> {
-  const order = await dependencies.orderRepository.findById(query.orderId);
+  const order = await dependencies.orderReadModel.findById(query.orderId);
 
   if (!order) {
     throw new NotFoundApplicationError(`Order not found: ${query.orderId}`);
   }
 
   try {
-    dependencies.authorizationPolicy?.assertCanViewOrder(query.actor, order);
+    dependencies.authorizationPolicy?.assertCanViewCustomerOrder(query.actor, order.customerId);
   } catch (error) {
     if (error instanceof AuthorizationApplicationError) {
       throw new NotFoundApplicationError(`Order not found: ${query.orderId}`);
@@ -32,14 +32,5 @@ export async function getOrderSummary(
     throw error;
   }
 
-  return {
-    orderId: order.id,
-    customerId: order.customerId,
-    lines: order.lines.map((line) => ({
-      sku: line.sku,
-      quantity: line.quantity,
-      unitPrice: line.unitPrice.toJSON(),
-    })),
-    totalAmount: order.totalAmount().toJSON(),
-  };
+  return order;
 }

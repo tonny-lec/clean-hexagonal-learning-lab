@@ -32,12 +32,14 @@ export class PostgresOutbox implements OutboxPort {
     }
   }
 
-  async listPending(): Promise<OutboxMessage[]> {
+  async listPending(batchSize = 100): Promise<OutboxMessage[]> {
     const result = await this.db.query<OutboxRow>(
       `SELECT id, event_type, aggregate_id, payload_json, occurred_at, published_at
        FROM outbox_messages
        WHERE published_at IS NULL
-       ORDER BY occurred_at ASC`,
+       ORDER BY occurred_at ASC
+       LIMIT $1`,
+      [batchSize],
     );
 
     return result.rows.map((row) => this.toMessage(row));

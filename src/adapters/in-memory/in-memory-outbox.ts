@@ -17,4 +17,17 @@ export class InMemoryOutbox implements OutboxPort {
       });
     }
   }
+
+  async listPending(batchSize?: number): Promise<OutboxMessage[]> {
+    const pending = this.messages.filter((message) => message.publishedAt == null);
+    return batchSize == null ? pending : pending.slice(0, batchSize);
+  }
+
+  async markAsPublished(ids: string[]): Promise<void> {
+    for (const message of this.messages) {
+      if (ids.includes(message.id)) {
+        message.publishedAt = new Date().toISOString();
+      }
+    }
+  }
 }

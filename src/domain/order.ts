@@ -5,6 +5,14 @@ export type OrderPlacedEvent = {
   type: 'order.placed';
   orderId: string;
   customerId: string;
+  lines: Array<{
+    sku: string;
+    quantity: number;
+    unitPrice: {
+      amountInMinor: number;
+      currency: string;
+    };
+  }>;
   totalAmount: {
     amountInMinor: number;
     currency: string;
@@ -53,6 +61,11 @@ export class Order {
         type: 'order.placed',
         orderId: order.id,
         customerId: order.customerId,
+        lines: order.lines.map((line) => ({
+          sku: line.sku,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice.toJSON(),
+        })),
         totalAmount: order.totalAmount().toJSON(),
       },
     ]);

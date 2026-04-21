@@ -30,9 +30,11 @@ describe('Order', () => {
         type: 'order.placed',
         orderId: 'order-3',
         customerId: 'customer-1',
+        lines: [{ sku: 'BOOK', quantity: 1, unitPrice: { amountInMinor: 1200, currency: 'JPY' } }],
         totalAmount: { amountInMinor: 1200, currency: 'JPY' },
       },
     ]);
+
     expect(order.pullDomainEvents()).toEqual([]);
   });
 });

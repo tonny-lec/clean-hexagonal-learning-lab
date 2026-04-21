@@ -31,6 +31,12 @@ describe('placeOrder transaction boundaries', () => {
         savedEvents.push(events);
         transactionsSeen.push(transaction);
       },
+      async listPending() {
+        return [];
+      },
+      async markAsPublished() {
+        return;
+      },
     };
 
     const unitOfWork: UnitOfWorkPort = {

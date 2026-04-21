@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { InMemoryDomainEventPublisher } from '../src/adapters/in-memory/in-memory-domain-event-publisher.js';
 import { InMemoryOrderRepository } from '../src/adapters/in-memory/in-memory-order-repository.js';
 import { InMemoryOutbox } from '../src/adapters/in-memory/in-memory-outbox.js';
 import { NoopUnitOfWork } from '../src/adapters/in-memory/noop-unit-of-work.js';
@@ -23,7 +22,6 @@ describe('placeOrder', () => {
   it('creates an order and stores its domain event in the outbox', async () => {
     const repository = new InMemoryOrderRepository();
     const outbox = new InMemoryOutbox();
-    const publishedEvents = new InMemoryDomainEventPublisher();
 
     const result = await placeOrder(
       {
@@ -47,7 +45,6 @@ describe('placeOrder', () => {
             return { customerId, amount: amount.toJSON(), confirmationId: 'payment-1' };
           },
         },
-        eventPublisher: publishedEvents,
         outbox,
         unitOfWork: new NoopUnitOfWork(),
         authorizationPolicy: new OrderAuthorizationPolicy({ highValueThreshold: Money.fromMinor(5000, 'JPY') }),
@@ -73,10 +70,13 @@ describe('placeOrder', () => {
         type: 'order.placed',
         orderId: 'order-1',
         customerId: 'customer-1',
+        lines: [
+          { sku: 'BOOK', quantity: 2, unitPrice: { amountInMinor: 1200, currency: 'JPY' } },
+          { sku: 'PEN', quantity: 1, unitPrice: { amountInMinor: 250, currency: 'JPY' } },
+        ],
         totalAmount: { amountInMinor: 2650, currency: 'JPY' },
       },
     });
-    expect(publishedEvents.publishedEvents).toEqual([]);
   });
 
   it('returns the existing order for the same idempotency key', async () => {
@@ -93,7 +93,6 @@ describe('placeOrder', () => {
           return { customerId, amount: amount.toJSON(), confirmationId: `payment-${charges}` };
         },
       },
-      eventPublisher: new InMemoryDomainEventPublisher(),
       outbox,
       unitOfWork: new NoopUnitOfWork(),
       authorizationPolicy: new OrderAuthorizationPolicy({ highValueThreshold: Money.fromMinor(5000, 'JPY') }),
@@ -150,7 +149,6 @@ describe('placeOrder', () => {
               return { customerId, amount: amount.toJSON(), confirmationId: 'payment-1' };
             },
           },
-          eventPublisher: new InMemoryDomainEventPublisher(),
           outbox,
           unitOfWork: new NoopUnitOfWork(),
           authorizationPolicy: new OrderAuthorizationPolicy({ highValueThreshold: Money.fromMinor(5000, 'JPY') }),
@@ -175,7 +173,6 @@ describe('placeOrder', () => {
           return { customerId, amount: amount.toJSON(), confirmationId: 'payment-1' };
         },
       },
-      eventPublisher: new InMemoryDomainEventPublisher(),
       outbox,
       unitOfWork: new NoopUnitOfWork(),
       authorizationPolicy: new OrderAuthorizationPolicy({ highValueThreshold: Money.fromMinor(5000, 'JPY') }),
@@ -237,7 +234,6 @@ describe('placeOrder', () => {
               throw new Error('gateway timeout');
             },
           },
-          eventPublisher: new InMemoryDomainEventPublisher(),
           outbox: new InMemoryOutbox(),
           unitOfWork: new NoopUnitOfWork(),
           authorizationPolicy: new OrderAuthorizationPolicy({ highValueThreshold: Money.fromMinor(5000, 'JPY') }),

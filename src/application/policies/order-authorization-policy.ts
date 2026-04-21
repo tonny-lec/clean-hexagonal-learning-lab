@@ -30,13 +30,17 @@ export class OrderAuthorizationPolicy {
   }
 
   assertCanViewOrder(actor: ActorDto | undefined, order: Order): void {
+    this.assertCanViewCustomerOrder(actor, order.customerId);
+  }
+
+  assertCanViewCustomerOrder(actor: ActorDto | undefined, customerId: string): void {
     const currentActor = this.requireActor(actor);
 
     if (currentActor.role === 'admin') {
       return;
     }
 
-    if (currentActor.role === 'customer' && currentActor.customerId === order.customerId) {
+    if (currentActor.role === 'customer' && currentActor.customerId === customerId) {
       return;
     }
 
