@@ -1,16 +1,19 @@
 import type { OrderSummaryDto } from '../dto/order-dto.js';
 import type { AuditLogPort } from '../ports/audit-log-port.js';
 import type { IntegrationEventPublisherPort } from '../ports/integration-event-publisher-port.js';
+import type { IntegrationEventSubscriberPort } from '../ports/integration-event-subscriber-port.js';
 import type { ObservabilityPort } from '../ports/observability-port.js';
 import type { OrderReadModelPort } from '../ports/order-read-model-port.js';
 import type { OutboxPort } from '../ports/outbox-port.js';
-import { toOrderPlacedIntegrationEvent } from '../integration-events/map-order-integration-event.js';
+import { toOrderPlacedIntegrationEvents } from '../integration-events/map-order-integration-event.js';
+import type { IntegrationEventVersion } from '../integration-events/order-integration-event.js';
 
 export type DispatchOutboxCommand = {
   batchSize?: number;
   retryDelaySeconds?: number;
   maxAttempts?: number;
   now?: string;
+  integrationEventVersions?: IntegrationEventVersion[];
 };
 
 export type DispatchOutboxResult = {
@@ -24,7 +27,8 @@ export async function dispatchOutbox(
   dependencies: {
     outbox: OutboxPort;
     integrationEventPublisher: IntegrationEventPublisherPort;
-    orderReadModel: OrderReadModelPort;
+    orderReadModel?: OrderReadModelPort;
+    integrationEventSubscriber?: IntegrationEventSubscriberPort;
     observability?: ObservabilityPort;
     auditLog?: AuditLogPort;
   },
@@ -33,6 +37,7 @@ export async function dispatchOutbox(
   const retryDelaySeconds = command.retryDelaySeconds ?? 60;
   const maxAttempts = command.maxAttempts ?? 3;
   const now = command.now ?? new Date().toISOString();
+  const integrationEventVersions = command.integrationEventVersions ?? ['v1'];
   const pendingMessages = await dependencies.outbox.listPending(batchSize, now);
 
   if (pendingMessages.length === 0) {
@@ -49,16 +54,23 @@ export async function dispatchOutbox(
   let deadLetteredCount = 0;
 
   for (const message of pendingMessages) {
-    const integrationEvent = toOrderPlacedIntegrationEvent(message);
+    const integrationEvents = toOrderPlacedIntegrationEvents(message, integrationEventVersions);
+    const primaryEvent = integrationEvents[0];
     const summary: OrderSummaryDto = {
-      orderId: integrationEvent.orderId,
-      customerId: integrationEvent.customerId,
-      lines: integrationEvent.lines,
-      totalAmount: integrationEvent.totalAmount,
+      orderId: message.payload.orderId,
+      customerId: message.payload.customerId,
+      lines: message.payload.lines,
+      totalAmount: message.payload.totalAmount,
     };
 
     try {
-      await dependencies.orderReadModel.upsert(summary);
+      if (dependencies.integrationEventSubscriber) {
+        for (const event of integrationEvents) {
+          await dependencies.integrationEventSubscriber.handle(event);
+        }
+      } else if (dependencies.orderReadModel) {
+        await dependencies.orderReadModel.upsert(summary);
+      }
     } catch (error) {
       failedCount += 1;
       await dependencies.observability?.record('outbox.projection.failed', {
@@ -81,7 +93,7 @@ export async function dispatchOutbox(
     }
 
     try {
-      await dependencies.integrationEventPublisher.publish([integrationEvent]);
+      await dependencies.integrationEventPublisher.publish(integrationEvents);
     } catch (error) {
       failedCount += 1;
       const deadLettered = await handleDeliveryFailure({
@@ -121,10 +133,11 @@ export async function dispatchOutbox(
     try {
       await dependencies.auditLog?.append({
         action: 'integration-event-published',
-        aggregateId: integrationEvent.orderId,
+        aggregateId: message.aggregateId,
         payload: {
-          integrationEventId: integrationEvent.integrationEventId,
-          eventType: integrationEvent.type,
+          integrationEventIds: integrationEvents.map((event) => event.integrationEventId),
+          eventTypes: integrationEvents.map((event) => event.type),
+          primaryEventType: primaryEvent.type,
         },
         occurredAt: now,
       });

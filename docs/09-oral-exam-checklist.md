@@ -262,6 +262,7 @@
 **見たいポイント**
 - domain 内の意味と外部共有契約の違い
 - versioning / schema evolution の論点に触れられるか
+- `order.placed.v1` と `order.placed.v2` を同時に流す意味を説明できるか
 
 ### Q37. なぜ `getOrderSummary` を read model に寄せる価値があるのですか？
 **見たいポイント**
@@ -279,25 +280,25 @@
 
 ### Q39. この repo でまだ「本番向けには足りない」ところはどこですか？
 **見たいポイント**
-- saga / compensation
-- long-running poller / scheduler の運用
-- event versioning / schema evolution の強化
+- dedicated worker / scheduler 運用
+- real message broker / queue 連携
+- subscriber ごとの failure policy / replay
+- schema registry / contract governance
 - structured logging / metrics / tracing の強化
-- 実 message broker / queue 連携
 - advanced validation / rate limit / security hardening
 - 実 DB / 実外部認証 / 実決済接続
 などを挙げられるか
 
 ### Q40. この repo を次に1段階進化させるなら何を追加しますか？ なぜですか？
 **見たいポイント**
-- event versioning strategy
 - dedicated worker / cron / queue consumer
-- dead-letter の再投入運用
-- real message broker 連携
+- real broker adapter
+- subscriber replay / re-drive
+- contract compatibility check
 - policy composition
 - payment workflow の saga 化
 - observability の structured 化
-など、**Sprint 5 の実装済み要素の次** を目的付きで答えられるか
+など、**Sprint 6 の実装済み要素の次** を目的付きで答えられるか
 
 ### Q41. 「Controller に業務ルールが入る」と何がつらいのですか？
 **見たいポイント**

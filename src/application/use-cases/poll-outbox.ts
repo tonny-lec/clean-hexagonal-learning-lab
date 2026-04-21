@@ -1,5 +1,7 @@
 import type { AuditLogPort } from '../ports/audit-log-port.js';
 import type { IntegrationEventPublisherPort } from '../ports/integration-event-publisher-port.js';
+import type { IntegrationEventSubscriberPort } from '../ports/integration-event-subscriber-port.js';
+import type { IntegrationEventVersion } from '../integration-events/order-integration-event.js';
 import type { ObservabilityPort } from '../ports/observability-port.js';
 import type { OrderReadModelPort } from '../ports/order-read-model-port.js';
 import type { OutboxPort } from '../ports/outbox-port.js';
@@ -12,6 +14,7 @@ export type PollOutboxCommand = {
   cycles?: number;
   startAt?: string;
   stepSeconds?: number;
+  integrationEventVersions?: IntegrationEventVersion[];
 };
 
 export type PollOutboxResult = {
@@ -24,7 +27,8 @@ export async function pollOutbox(
   dependencies: {
     outbox: OutboxPort;
     integrationEventPublisher: IntegrationEventPublisherPort;
-    orderReadModel: OrderReadModelPort;
+    orderReadModel?: OrderReadModelPort;
+    integrationEventSubscriber?: IntegrationEventSubscriberPort;
     observability?: ObservabilityPort;
     auditLog?: AuditLogPort;
   },
@@ -43,6 +47,7 @@ export async function pollOutbox(
         retryDelaySeconds: command.retryDelaySeconds,
         maxAttempts: command.maxAttempts,
         now,
+        integrationEventVersions: command.integrationEventVersions,
       },
       dependencies,
     );

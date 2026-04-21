@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { OrderSummaryDto } from '../src/application/dto/order-dto.js';
+import type { IntegrationEventSubscriberPort } from '../src/application/ports/integration-event-subscriber-port.js';
 import { InMemoryAuditLog } from '../src/adapters/in-memory/in-memory-audit-log.js';
 import { InMemoryIntegrationEventPublisher } from '../src/adapters/in-memory/in-memory-integration-event-publisher.js';
 import { InMemoryObservability } from '../src/adapters/in-memory/in-memory-observability.js';
@@ -45,6 +46,14 @@ class FailOncePublishAckOutbox extends InMemoryOutbox {
     }
 
     await super.markAsPublished(ids);
+  }
+}
+
+class RecordingSubscriber implements IntegrationEventSubscriberPort {
+  readonly handled: Array<{ type: string; orderId: string }> = [];
+
+  async handle(event: Parameters<IntegrationEventSubscriberPort['handle']>[0]): Promise<void> {
+    this.handled.push({ type: event.type, orderId: event.orderId });
   }
 }
 
@@ -350,5 +359,41 @@ describe('dispatchOutbox', () => {
 
     expect(second).toEqual({ dispatchedCount: 0, failedCount: 0, deadLetteredCount: 0 });
     expect(publisher.publishedEvents).toHaveLength(1);
+  });
+
+  it('can publish both v1 and v2 contracts while notifying the subscriber boundary', async () => {
+    const outbox = new InMemoryOutbox();
+    const publisher = new InMemoryIntegrationEventPublisher();
+    const subscriber = new RecordingSubscriber();
+
+    await outbox.save([
+      {
+        type: 'order.placed',
+        orderId: 'order-versioned',
+        customerId: 'customer-1',
+        lines: [{ sku: 'BOOK', quantity: 1, unitPrice: { amountInMinor: 1200, currency: 'JPY' } }],
+        totalAmount: { amountInMinor: 1200, currency: 'JPY' },
+      },
+    ]);
+
+    const result = await dispatchOutbox(
+      {
+        batchSize: 10,
+        now: '2030-01-01T00:00:00.000Z',
+        integrationEventVersions: ['v1', 'v2'],
+      },
+      {
+        outbox,
+        integrationEventPublisher: publisher,
+        integrationEventSubscriber: subscriber,
+      },
+    );
+
+    expect(result).toEqual({ dispatchedCount: 1, failedCount: 0, deadLetteredCount: 0 });
+    expect(publisher.publishedEvents.map((event) => event.type)).toEqual(['order.placed.v1', 'order.placed.v2']);
+    expect(subscriber.handled).toEqual([
+      { type: 'order.placed.v1', orderId: 'order-versioned' },
+      { type: 'order.placed.v2', orderId: 'order-versioned' },
+    ]);
   });
 });

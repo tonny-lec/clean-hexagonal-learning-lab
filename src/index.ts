@@ -5,6 +5,7 @@ import { dispatchOutbox } from './application/use-cases/dispatch-outbox.js';
 import { getOrderSummary } from './application/use-cases/get-order-summary.js';
 import { pollOutbox } from './application/use-cases/poll-outbox.js';
 import { placeOrder } from './application/use-cases/place-order.js';
+import type { IntegrationEventVersion } from './application/integration-events/order-integration-event.js';
 import { createDemoDependencies } from './composition-root.js';
 
 const dependencies = createDemoDependencies();
@@ -15,16 +16,19 @@ const adminActor = {
   role: 'admin' as const,
 };
 
+const integrationEventVersions = getConfiguredIntegrationEventVersions();
+
 if (mode === 'http') {
   console.log(await startDemoHttpServer(dependencies));
 } else if (mode === 'dispatch') {
   console.log(
     JSON.stringify(
       await dispatchOutbox(
-        { batchSize: 100 },
+        { batchSize: 100, integrationEventVersions },
         {
           outbox: dependencies.outbox,
           integrationEventPublisher: dependencies.integrationEventPublisher,
+          integrationEventSubscriber: dependencies.integrationEventSubscriber,
           orderReadModel: dependencies.orderReadModel,
           observability: dependencies.observability,
           auditLog: dependencies.auditLog,
@@ -53,10 +57,12 @@ if (mode === 'http') {
           cycles: 3,
           retryDelaySeconds: 60,
           maxAttempts: 3,
+          integrationEventVersions,
         },
         {
           outbox: dependencies.outbox,
           integrationEventPublisher: dependencies.integrationEventPublisher,
+          integrationEventSubscriber: dependencies.integrationEventSubscriber,
           orderReadModel: dependencies.orderReadModel,
           observability: dependencies.observability,
           auditLog: dependencies.auditLog,
@@ -97,10 +103,11 @@ if (mode === 'http') {
     dependencies,
   );
   await dispatchOutbox(
-    { batchSize: 100 },
+    { batchSize: 100, integrationEventVersions },
     {
       outbox: dependencies.outbox,
       integrationEventPublisher: dependencies.integrationEventPublisher,
+      integrationEventSubscriber: dependencies.integrationEventSubscriber,
       orderReadModel: dependencies.orderReadModel,
       observability: dependencies.observability,
       auditLog: dependencies.auditLog,
@@ -133,4 +140,14 @@ if (mode === 'http') {
       (command) => placeOrder(command, dependencies),
     ),
   );
+}
+
+function getConfiguredIntegrationEventVersions(): IntegrationEventVersion[] {
+  const raw = process.env.INTEGRATION_EVENT_VERSIONS ?? 'v1';
+  const versions = raw
+    .split(',')
+    .map((version) => version.trim())
+    .filter((version): version is IntegrationEventVersion => version === 'v1' || version === 'v2');
+
+  return versions.length > 0 ? versions : ['v1'];
 }
