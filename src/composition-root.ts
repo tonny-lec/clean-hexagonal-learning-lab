@@ -5,6 +5,9 @@ import { ConsoleAuditLog } from './adapters/console/console-audit-log.js';
 import { ConsoleIntegrationEventPublisher } from './adapters/console/console-integration-event-publisher.js';
 import { ConsoleObservability } from './adapters/console/console-observability.js';
 import { ConsolePaymentGateway } from './adapters/console/console-payment-gateway.js';
+import { ConsoleFulfillmentService } from './adapters/fulfillment/console-fulfillment-service.js';
+import { FakeFulfillmentService } from './adapters/fulfillment/fake-fulfillment-service.js';
+import { FailingFulfillmentService } from './adapters/fulfillment/failing-fulfillment-service.js';
 import { InMemoryDeliveryTriggerConsumer } from './adapters/in-memory/in-memory-delivery-trigger-consumer.js';
 import { InMemoryOrderReadModel } from './adapters/in-memory/in-memory-order-read-model.js';
 import { InMemoryOrderRepository } from './adapters/in-memory/in-memory-order-repository.js';
@@ -41,6 +44,20 @@ function createPaymentGateway() {
   return new ConsolePaymentGateway();
 }
 
+function createFulfillmentService() {
+  const mode = process.env.FULFILLMENT_SERVICE ?? 'console';
+
+  if (mode === 'fake') {
+    return new FakeFulfillmentService();
+  }
+
+  if (mode === 'failing') {
+    return new FailingFulfillmentService('Configured fulfillment service failure.');
+  }
+
+  return new ConsoleFulfillmentService();
+}
+
 function createIntegrationEventPublisher() {
   const mode = process.env.INTEGRATION_PUBLISHER ?? 'console';
 
@@ -70,6 +87,7 @@ export function createDemoDependencies() {
     BAG: 3200,
   });
   const paymentGateway = createPaymentGateway();
+  const fulfillmentService = createFulfillmentService();
   const integrationEventPublisher = createIntegrationEventPublisher();
   const subscriberFailureStore = new InMemorySubscriberDeliveryFailureStore();
   const subscriberFailurePolicy = new StaticSubscriberFailurePolicy({
@@ -119,6 +137,7 @@ export function createDemoDependencies() {
     orderRepository,
     orderReadModel,
     paymentGateway,
+    fulfillmentService,
     integrationEventPublisher,
     integrationEventSubscriber,
     integrationEventSubscribers,

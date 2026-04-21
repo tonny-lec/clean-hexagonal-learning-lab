@@ -1,4 +1,4 @@
-import type { PaymentGatewayPort, PaymentReceipt } from '../../application/ports/payment-gateway-port.js';
+import type { PaymentGatewayPort, PaymentReceipt, RefundReceipt } from '../../application/ports/payment-gateway-port.js';
 import type { Money } from '../../domain/money.js';
 
 export class ConsolePaymentGateway implements PaymentGatewayPort {
@@ -10,6 +10,19 @@ export class ConsolePaymentGateway implements PaymentGatewayPort {
       customerId,
       amount: amount.toJSON(),
       confirmationId,
+    };
+  }
+
+  async refund(paymentConfirmationId: string, amount: Money, requestId?: string): Promise<RefundReceipt> {
+    const refundConfirmationId = requestId ? `refund-${requestId}` : `refund-${paymentConfirmationId}`;
+    console.log(
+      `Refunding ${amount.amountInMinor} ${amount.currency} for ${paymentConfirmationId}. Confirmation: ${refundConfirmationId}`,
+    );
+
+    return {
+      paymentConfirmationId,
+      amount: amount.toJSON(),
+      refundConfirmationId,
     };
   }
 }

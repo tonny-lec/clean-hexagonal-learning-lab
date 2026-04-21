@@ -286,24 +286,23 @@
 **見たいポイント**
 - durable consumer / consumer group / queue semantics の整理
 - schema registry / contract governance
-- payment workflow / saga / compensation
+- workflow state の durable persistence / operator recovery flow
 - multi-node worker orchestration / concurrency control
 - subscriber replay の運用 UI / tooling
 - advanced validation / rate limit / security hardening
-- 実 DB / 実外部認証 / 実決済接続
+- 実 DB / 実外部認証 / 実決済接続 / 実 fulfillment 接続
 などを挙げられるか
 
 ### Q40. この repo を次に1段階進化させるなら何を追加しますか？ なぜですか？
 **見たいポイント**
-- payment workflow の saga 化
-- compensation action / refund path
-- retry と compensation の境界整理
-- consumer group / durable consumer
 - bounded context / ACL の整理
+- strategic DDD の観点から Order / Payment / Fulfillment の境界を見直すこと
+- consumer group / durable consumer
+- workflow state の durable persistence / operator recovery flow
 - contract compatibility check
 - replay tooling / operator flow
 - worker concurrency / scheduler 強化
-など、**Sprint 10 の実装済み要素の次** を目的付きで答えられるか
+など、**Sprint 11 の実装済み要素の次** を目的付きで答えられるか
 
 ### Q41. 「Controller に業務ルールが入る」と何がつらいのですか？
 **見たいポイント**

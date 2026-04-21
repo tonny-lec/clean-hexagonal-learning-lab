@@ -44,6 +44,9 @@ describe('placeOrder', () => {
           async charge(customerId, amount) {
             return { customerId, amount: amount.toJSON(), confirmationId: 'payment-1' };
           },
+          async refund(paymentConfirmationId, amount) {
+            return { paymentConfirmationId, amount: amount.toJSON(), refundConfirmationId: 'refund-1' };
+          },
         },
         outbox,
         unitOfWork: new NoopUnitOfWork(),
@@ -91,6 +94,9 @@ describe('placeOrder', () => {
         async charge(customerId: string, amount: Money) {
           charges += 1;
           return { customerId, amount: amount.toJSON(), confirmationId: `payment-${charges}` };
+        },
+        async refund(paymentConfirmationId: string, amount: Money) {
+          return { paymentConfirmationId, amount: amount.toJSON(), refundConfirmationId: 'refund-1' };
         },
       },
       outbox,
@@ -148,6 +154,9 @@ describe('placeOrder', () => {
               charges += 1;
               return { customerId, amount: amount.toJSON(), confirmationId: 'payment-1' };
             },
+            async refund(paymentConfirmationId, amount) {
+              return { paymentConfirmationId, amount: amount.toJSON(), refundConfirmationId: 'refund-1' };
+            },
           },
           outbox,
           unitOfWork: new NoopUnitOfWork(),
@@ -171,6 +180,9 @@ describe('placeOrder', () => {
       paymentGateway: {
         async charge(customerId: string, amount: Money) {
           return { customerId, amount: amount.toJSON(), confirmationId: 'payment-1' };
+        },
+        async refund(paymentConfirmationId: string, amount: Money) {
+          return { paymentConfirmationId, amount: amount.toJSON(), refundConfirmationId: 'refund-1' };
         },
       },
       outbox,
@@ -231,6 +243,9 @@ describe('placeOrder', () => {
           orderRepository: repository,
           paymentGateway: {
             async charge() {
+              throw new Error('gateway timeout');
+            },
+            async refund() {
               throw new Error('gateway timeout');
             },
           },

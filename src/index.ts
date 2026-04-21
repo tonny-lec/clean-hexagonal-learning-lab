@@ -7,6 +7,7 @@ import { getOrderSummary } from './application/use-cases/get-order-summary.js';
 import { pollOutbox } from './application/use-cases/poll-outbox.js';
 import { placeOrder } from './application/use-cases/place-order.js';
 import { replaySubscriberFailures } from './application/use-cases/replay-subscriber-failures.js';
+import { runOrderCheckoutSaga } from './application/use-cases/run-order-checkout-saga.js';
 import { createDemoDependencies } from './composition-root.js';
 
 const dependencies = createDemoDependencies();
@@ -187,6 +188,41 @@ if (mode === 'http') {
       2,
     ),
   );
+} else if (mode === 'saga') {
+  const sagaResult = await runOrderCheckoutSaga(
+    {
+      actor: adminActor,
+      customerId: 'saga-demo',
+      items: [{ sku: 'BOOK', quantity: 1 }],
+      idempotencyKey: 'saga-demo-key',
+    },
+    {
+      catalog: dependencies.catalog,
+      orderRepository: dependencies.orderRepository,
+      outbox: dependencies.outbox,
+      unitOfWork: dependencies.unitOfWork,
+      paymentGateway: dependencies.paymentGateway,
+      fulfillmentService: dependencies.fulfillmentService,
+      authorizationPolicy: dependencies.authorizationPolicy,
+      observability: dependencies.observability,
+      auditLog: dependencies.auditLog,
+      idGenerator: dependencies.idGenerator,
+    },
+  );
+
+  let summary: Awaited<ReturnType<typeof getOrderSummary>> | undefined;
+  if (sagaResult.workflowStatus === 'completed') {
+    await dispatchOutbox({ batchSize: 100, integrationEventVersions }, getDeliveryDependencies());
+    summary = await getOrderSummary(
+      { orderId: sagaResult.orderId, actor: adminActor },
+      {
+        orderReadModel: dependencies.orderReadModel,
+        authorizationPolicy: dependencies.authorizationPolicy,
+      },
+    );
+  }
+
+  console.log(JSON.stringify({ sagaResult, summary }, null, 2));
 } else if (mode === 'batch') {
   const results = await runPlaceOrderBatch(
     [

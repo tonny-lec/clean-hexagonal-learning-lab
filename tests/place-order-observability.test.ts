@@ -37,6 +37,9 @@ describe('placeOrder observability', () => {
           async charge(customerId, amount) {
             return { customerId, amount: amount.toJSON(), confirmationId: 'payment-1' };
           },
+          async refund(paymentConfirmationId, amount) {
+            return { paymentConfirmationId, amount: amount.toJSON(), refundConfirmationId: 'refund-1' };
+          },
         },
         outbox: new InMemoryOutbox(),
         unitOfWork: new NoopUnitOfWork(),
