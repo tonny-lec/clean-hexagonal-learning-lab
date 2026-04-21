@@ -286,7 +286,7 @@
 **見たいポイント**
 - durable consumer / consumer group / queue semantics の整理
 - schema registry / contract governance
-- structured logging / metrics / tracing の強化
+- payment workflow / saga / compensation
 - multi-node worker orchestration / concurrency control
 - subscriber replay の運用 UI / tooling
 - advanced validation / rate limit / security hardening
@@ -295,15 +295,15 @@
 
 ### Q40. この repo を次に1段階進化させるなら何を追加しますか？ なぜですか？
 **見たいポイント**
-- structured logging / metrics / tracing
-- requestId / correlationId / trace context の導入
-- consumer group / durable consumer
 - payment workflow の saga 化
+- compensation action / refund path
+- retry と compensation の境界整理
+- consumer group / durable consumer
 - bounded context / ACL の整理
 - contract compatibility check
 - replay tooling / operator flow
 - worker concurrency / scheduler 強化
-など、**Sprint 9 の実装済み要素の次** を目的付きで答えられるか
+など、**Sprint 10 の実装済み要素の次** を目的付きで答えられるか
 
 ### Q41. 「Controller に業務ルールが入る」と何がつらいのですか？
 **見たいポイント**
