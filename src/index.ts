@@ -3,6 +3,7 @@ import { runGetOrderCli, runPlaceOrderCli } from './adapters/cli/order-cli.js';
 import { startDemoHttpServer } from './adapters/http/create-demo-http-server.js';
 import { dispatchOutbox } from './application/use-cases/dispatch-outbox.js';
 import { getOrderSummary } from './application/use-cases/get-order-summary.js';
+import { pollOutbox } from './application/use-cases/poll-outbox.js';
 import { placeOrder } from './application/use-cases/place-order.js';
 import { createDemoDependencies } from './composition-root.js';
 
@@ -21,6 +22,38 @@ if (mode === 'http') {
     JSON.stringify(
       await dispatchOutbox(
         { batchSize: 100 },
+        {
+          outbox: dependencies.outbox,
+          integrationEventPublisher: dependencies.integrationEventPublisher,
+          orderReadModel: dependencies.orderReadModel,
+          observability: dependencies.observability,
+          auditLog: dependencies.auditLog,
+        },
+      ),
+      null,
+      2,
+    ),
+  );
+} else if (mode === 'poller') {
+  await placeOrder(
+    {
+      actor: adminActor,
+      customerId: 'poller-demo',
+      items: [{ sku: 'BOOK', quantity: 1 }],
+      idempotencyKey: 'poller-demo-key',
+    },
+    dependencies,
+  );
+
+  console.log(
+    JSON.stringify(
+      await pollOutbox(
+        {
+          batchSize: 100,
+          cycles: 3,
+          retryDelaySeconds: 60,
+          maxAttempts: 3,
+        },
         {
           outbox: dependencies.outbox,
           integrationEventPublisher: dependencies.integrationEventPublisher,

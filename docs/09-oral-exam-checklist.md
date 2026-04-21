@@ -255,7 +255,8 @@
 **見たいポイント**
 - pending message を運ぶ責務
 - business transaction の外で delivery を進めること
-- mark-as-published / retry の入口だと説明できるか
+- mark-as-published / retry / dead-letter の境界だと説明できるか
+- poller / worker から呼ばれる理由を言えるか
 
 ### Q36. domain event と integration event は何が違いますか？
 **見たいポイント**
@@ -279,24 +280,24 @@
 ### Q39. この repo でまだ「本番向けには足りない」ところはどこですか？
 **見たいポイント**
 - saga / compensation
-- retry / timeout / dead-letter
-- event versioning の進化
-- poller / scheduler 運用
+- long-running poller / scheduler の運用
+- event versioning / schema evolution の強化
 - structured logging / metrics / tracing の強化
+- 実 message broker / queue 連携
 - advanced validation / rate limit / security hardening
-- 実 DB / 実 message broker / 実外部認証への接続
+- 実 DB / 実外部認証 / 実決済接続
 などを挙げられるか
 
 ### Q40. この repo を次に1段階進化させるなら何を追加しますか？ なぜですか？
 **見たいポイント**
-- retryable outbox dispatcher
-- dead-letter queue
 - event versioning strategy
-- scheduler / poller の常駐運用
+- dedicated worker / cron / queue consumer
+- dead-letter の再投入運用
+- real message broker 連携
 - policy composition
 - payment workflow の saga 化
 - observability の structured 化
-など、**Sprint 4 の実装済み要素の次** を目的付きで答えられるか
+など、**Sprint 5 の実装済み要素の次** を目的付きで答えられるか
 
 ### Q41. 「Controller に業務ルールが入る」と何がつらいのですか？
 **見たいポイント**

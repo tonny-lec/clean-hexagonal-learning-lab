@@ -12,6 +12,7 @@ export async function runPostgresMigrations(db: Queryable): Promise<void> {
     '002_create_idempotency_records.sql',
     '003_create_outbox.sql',
     '004_create_order_summaries.sql',
+    '005_extend_outbox_for_retry.sql',
   ];
 
   for (const file of files) {

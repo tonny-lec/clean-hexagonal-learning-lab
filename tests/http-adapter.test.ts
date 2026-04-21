@@ -132,12 +132,12 @@ describe('HTTP adapters', () => {
     const response = await handleDispatchOutboxHttp(async (command) => {
       expect(command).toEqual({ batchSize: 100 });
 
-      return { dispatchedCount: 2 };
+      return { dispatchedCount: 2, failedCount: 0, deadLetteredCount: 0 };
     });
 
     expect(response).toEqual({
       status: 200,
-      body: { dispatchedCount: 2 },
+      body: { dispatchedCount: 2, failedCount: 0, deadLetteredCount: 0 },
     });
   });
 

@@ -8,10 +8,22 @@ export type OutboxMessage = {
   payload: OrderPlacedEvent;
   occurredAt: string;
   publishedAt: string | null;
+  retryCount: number;
+  lastError: string | null;
+  nextAttemptAt: string;
+  deadLetteredAt: string | null;
+};
+
+export type OutboxFailure = {
+  errorMessage: string;
+  nextAttemptAt: string | null;
+  deadLetteredAt: string | null;
 };
 
 export interface OutboxPort {
   save(events: OrderPlacedEvent[], transaction?: TransactionContext): Promise<void>;
-  listPending(batchSize?: number): Promise<OutboxMessage[]>;
+  listPending(batchSize?: number, now?: string): Promise<OutboxMessage[]>;
+  listDeadLetters(batchSize?: number): Promise<OutboxMessage[]>;
   markAsPublished(ids: string[]): Promise<void>;
+  markAsFailed(id: string, failure: OutboxFailure): Promise<void>;
 }

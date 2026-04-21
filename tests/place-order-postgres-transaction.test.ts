@@ -34,7 +34,13 @@ describe('placeOrder transaction boundaries', () => {
       async listPending() {
         return [];
       },
+      async listDeadLetters() {
+        return [];
+      },
       async markAsPublished() {
+        return;
+      },
+      async markAsFailed() {
         return;
       },
     };
