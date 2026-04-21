@@ -11,6 +11,7 @@ import { InMemoryOrderRepository } from './adapters/in-memory/in-memory-order-re
 import { InMemoryOutbox } from './adapters/in-memory/in-memory-outbox.js';
 import { NoopUnitOfWork } from './adapters/in-memory/noop-unit-of-work.js';
 import { StaticProductCatalog } from './adapters/in-memory/static-product-catalog.js';
+import { NatsIntegrationEventPublisher } from './adapters/nats/nats-integration-event-publisher.js';
 import { FakePaymentGateway } from './adapters/payment/fake-payment-gateway.js';
 import { FailingPaymentGateway } from './adapters/payment/failing-payment-gateway.js';
 import { StripeLikePaymentGateway } from './adapters/payment/stripe-like-payment-gateway.js';
@@ -42,6 +43,16 @@ function createIntegrationEventPublisher() {
 
   if (mode === 'broker-like') {
     return new BrokerLikeIntegrationEventPublisher();
+  }
+
+  if (mode === 'nats') {
+    const server = process.env.NATS_URL ?? 'nats://127.0.0.1:4222';
+    const subjectPrefix = process.env.NATS_SUBJECT_PREFIX ?? 'events';
+
+    return new NatsIntegrationEventPublisher({
+      servers: [server],
+      subjectPrefix,
+    });
   }
 
   return new ConsoleIntegrationEventPublisher();

@@ -7,7 +7,10 @@
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "start": "node dist/src/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "broker:nats:up": "docker compose -f infra/nats/docker-compose.yml up -d",
+    "broker:nats:down": "docker compose -f infra/nats/docker-compose.yml down -v",
+    "broker:nats:subscribe": "tsx scripts/nats-subscribe.ts"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
@@ -18,6 +21,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
+    "nats": "^2.29.3",
     "pg": "^8.20.0"
   }
 }
