@@ -199,6 +199,29 @@ npm run dev -- query
 npm run dev -- dispatch
 ```
 
+> `dispatch` モードは **現在のプロセス内に pending outbox message があるとき** にそれらを配送します。  
+> そのため、単独で `npm run dev -- dispatch` を実行すると in-memory 構成では `dispatchedCount: 0` になりやすいです。
+
+**「注文を作る → outbox を dispatch する → read model から読む」流れを一発で見たい場合は、まず `query` モードを使う**のが分かりやすいです。
+
+```bash
+npm run dev -- query
+```
+
+`query` モードの中では:
+1. `placeOrder`
+2. `dispatchOutbox`
+3. `getOrderSummary`
+
+を順番に実行するため、eventual consistency の学習導線として自然です。
+
+HTTP で同じ流れを見たい場合は、
+1. `POST /orders`
+2. `POST /dispatch-outbox`
+3. `GET /orders/:id`
+
+の順に呼んでください。
+
 ### Batch デモ
 ```bash
 npm run dev -- batch

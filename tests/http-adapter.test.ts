@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { InvalidRequestApplicationError } from '../src/application/errors/application-error.js';
+import { handleDispatchOutboxHttp } from '../src/adapters/http/dispatch-outbox-http-handler.js';
 import { handleGetOrderHttp } from '../src/adapters/http/get-order-http-handler.js';
 import { handlePlaceOrderHttp } from '../src/adapters/http/place-order-http-handler.js';
 
@@ -127,22 +129,43 @@ describe('HTTP adapters', () => {
   });
 
   it('maps a dispatch-outbox request to the dispatcher use case', async () => {
-    const response = await handleGetOrderHttp(
-      {
-        headers: {
-          'x-actor-id': 'admin-1',
-          'x-actor-role': 'admin',
-        },
-        params: { orderId: 'dispatch-preview' },
-      },
-      async ({ orderId }) => ({
-        orderId,
-        customerId: 'dispatcher',
-        lines: [],
-        totalAmount: { amountInMinor: 0, currency: 'JPY' },
-      }),
-    );
+    const response = await handleDispatchOutboxHttp(async (command) => {
+      expect(command).toEqual({ batchSize: 100 });
 
-    expect(response.status).toBe(200);
+      return { dispatchedCount: 2 };
+    });
+
+    expect(response).toEqual({
+      status: 200,
+      body: { dispatchedCount: 2 },
+    });
+  });
+
+  it('returns 400 when dispatch-outbox raises an application error', async () => {
+    const response = await handleDispatchOutboxHttp(async () => {
+      throw new InvalidRequestApplicationError('batchSize must be positive.');
+    });
+
+    expect(response).toEqual({
+      status: 400,
+      body: {
+        error: 'InvalidRequest',
+        message: 'batchSize must be positive.',
+      },
+    });
+  });
+
+  it('returns 500 when dispatch-outbox raises an unexpected error', async () => {
+    const response = await handleDispatchOutboxHttp(async () => {
+      throw new Error('boom');
+    });
+
+    expect(response).toEqual({
+      status: 500,
+      body: {
+        error: 'InternalServerError',
+        message: 'An unexpected error occurred.',
+      },
+    });
   });
 });

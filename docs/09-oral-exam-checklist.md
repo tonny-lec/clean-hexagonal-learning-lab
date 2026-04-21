@@ -278,22 +278,25 @@
 
 ### Q39. この repo でまだ「本番向けには足りない」ところはどこですか？
 **見たいポイント**
-- saga
-- retry / timeout
-- observability
-- advanced validation
-- outbox dispatcher
-- audit log
+- saga / compensation
+- retry / timeout / dead-letter
+- event versioning の進化
+- poller / scheduler 運用
+- structured logging / metrics / tracing の強化
+- advanced validation / rate limit / security hardening
+- 実 DB / 実 message broker / 実外部認証への接続
 などを挙げられるか
 
 ### Q40. この repo を次に1段階進化させるなら何を追加しますか？ なぜですか？
 **見たいポイント**
-- outbox dispatcher
-- 複数 payment adapter
-- query read model
-- integration event
+- retryable outbox dispatcher
+- dead-letter queue
+- event versioning strategy
+- scheduler / poller の常駐運用
 - policy composition
-など、目的付きで答えられるか
+- payment workflow の saga 化
+- observability の structured 化
+など、**Sprint 4 の実装済み要素の次** を目的付きで答えられるか
 
 ### Q41. 「Controller に業務ルールが入る」と何がつらいのですか？
 **見たいポイント**
