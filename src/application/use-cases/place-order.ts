@@ -1,17 +1,21 @@
 import type { PlaceOrderResultDto } from '../dto/order-dto.js';
+import type { ActorDto } from '../dto/actor-dto.js';
 import {
   ExternalServiceError,
   InvalidRequestApplicationError,
 } from '../errors/application-error.js';
 import type { DomainEventPublisherPort } from '../ports/domain-event-publisher-port.js';
 import type { OrderRepositoryPort } from '../ports/order-repository-port.js';
+import type { OutboxPort } from '../ports/outbox-port.js';
 import type { PaymentGatewayPort } from '../ports/payment-gateway-port.js';
 import type { ProductCatalogPort } from '../ports/product-catalog-port.js';
 import type { UnitOfWorkPort } from '../ports/unit-of-work-port.js';
+import type { OrderAuthorizationPolicy } from '../policies/order-authorization-policy.js';
 import { DomainValidationError } from '../../domain/errors.js';
 import { Order } from '../../domain/order.js';
 
 export type PlaceOrderCommand = {
+  actor?: ActorDto;
   customerId: string;
   items: Array<{
     sku: string;
@@ -24,8 +28,10 @@ export type PlaceOrderDependencies = {
   catalog: ProductCatalogPort;
   orderRepository: OrderRepositoryPort;
   paymentGateway: PaymentGatewayPort;
-  eventPublisher: DomainEventPublisherPort;
+  eventPublisher?: DomainEventPublisherPort;
+  outbox: OutboxPort;
   unitOfWork: UnitOfWorkPort;
+  authorizationPolicy?: OrderAuthorizationPolicy;
   idGenerator: () => string;
 };
 
@@ -40,6 +46,12 @@ export async function placeOrder(
   if (command.idempotencyKey && dependencies.orderRepository.findByIdempotencyKey) {
     const existingRecord = await dependencies.orderRepository.findByIdempotencyKey(command.idempotencyKey);
     if (existingRecord) {
+      dependencies.authorizationPolicy?.assertCanPlaceOrder({
+        actor: command.actor,
+        customerId: existingRecord.order.customerId,
+        totalAmount: existingRecord.order.totalAmount(),
+      });
+
       return {
         orderId: existingRecord.order.id,
         totalAmount: existingRecord.order.totalAmount().toJSON(),
@@ -60,6 +72,12 @@ export async function placeOrder(
     const order = Order.place(dependencies.idGenerator(), command.customerId, lines);
     const totalAmount = order.totalAmount();
 
+    dependencies.authorizationPolicy?.assertCanPlaceOrder({
+      actor: command.actor,
+      customerId: order.customerId,
+      totalAmount,
+    });
+
     let paymentConfirmationId = '';
     try {
       const payment = await dependencies.paymentGateway.charge(
@@ -72,14 +90,19 @@ export async function placeOrder(
       throw new ExternalServiceError('Payment gateway failed.', { cause });
     }
 
-    await dependencies.unitOfWork.runInTransaction(async () => {
-      await dependencies.orderRepository.save(order, {
-        idempotencyKey: command.idempotencyKey,
-        paymentConfirmationId,
-      });
-    });
+    const domainEvents = order.pullDomainEvents();
 
-    await dependencies.eventPublisher.publish(order.pullDomainEvents());
+    await dependencies.unitOfWork.runInTransaction(async (transaction) => {
+      await dependencies.orderRepository.save(
+        order,
+        {
+          idempotencyKey: command.idempotencyKey,
+          paymentConfirmationId,
+        },
+        transaction,
+      );
+      await dependencies.outbox.save(domainEvents, transaction);
+    });
 
     return {
       orderId: order.id,

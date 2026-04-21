@@ -24,7 +24,11 @@ export class SqliteOrderRepository implements OrderRepositoryPort {
     `);
   }
 
-  async save(order: Order, options?: { idempotencyKey?: string; paymentConfirmationId?: string }): Promise<void> {
+  async save(
+    order: Order,
+    options?: { idempotencyKey?: string; paymentConfirmationId?: string },
+    _transaction?: unknown,
+  ): Promise<void> {
     const payload = JSON.stringify({
       id: order.id,
       customerId: order.customerId,

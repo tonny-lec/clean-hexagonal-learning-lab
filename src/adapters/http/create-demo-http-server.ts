@@ -1,18 +1,19 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { getOrderSummary } from '../../application/use-cases/get-order-summary.js';
 import type { PlaceOrderDependencies } from '../../application/use-cases/place-order.js';
 import { placeOrder } from '../../application/use-cases/place-order.js';
-import { getOrderSummary } from '../../application/use-cases/get-order-summary.js';
 import { handleGetOrderHttp } from './get-order-http-handler.js';
 import { handlePlaceOrderHttp } from './place-order-http-handler.js';
 
 export function createDemoHttpServer(dependencies: PlaceOrderDependencies) {
   return createServer(async (req, res) => {
     const url = req.url ?? '/';
+    const headers = normalizeHeaders(req.headers);
 
     if (req.method === 'POST' && url === '/orders') {
       const body = await readBody(req);
-      const response = await handlePlaceOrderHttp({ body }, (command) => placeOrder(command, dependencies));
+      const response = await handlePlaceOrderHttp({ body, headers }, (command) => placeOrder(command, dependencies));
       res.writeHead(response.status, { 'content-type': 'application/json' });
       res.end(JSON.stringify(response.body));
       return;
@@ -20,8 +21,11 @@ export function createDemoHttpServer(dependencies: PlaceOrderDependencies) {
 
     if (req.method === 'GET' && url.startsWith('/orders/')) {
       const orderId = url.replace('/orders/', '');
-      const response = await handleGetOrderHttp({ params: { orderId } }, (query) =>
-        getOrderSummary(query, { orderRepository: dependencies.orderRepository }),
+      const response = await handleGetOrderHttp({ params: { orderId }, headers }, (query) =>
+        getOrderSummary(query, {
+          orderRepository: dependencies.orderRepository,
+          authorizationPolicy: dependencies.authorizationPolicy,
+        }),
       );
       res.writeHead(response.status, { 'content-type': 'application/json' });
       res.end(JSON.stringify(response.body));
@@ -50,4 +54,10 @@ async function readBody(request: AsyncIterable<Buffer | string>): Promise<string
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
   return Buffer.concat(chunks).toString('utf-8');
+}
+
+function normalizeHeaders(headers: Record<string, string | string[] | undefined>): Record<string, string | undefined> {
+  return Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value]),
+  );
 }

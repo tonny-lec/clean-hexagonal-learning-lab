@@ -227,55 +227,78 @@
 - persistence detail の差し替え
 - 現実では migration / transaction / mapping がさらに必要になると理解しているか
 
+### Q31. Outbox pattern は何を守るために入れるのですか？
+**見たいポイント**
+- save 成功 / publish 失敗の穴を説明できるか
+- 「まず durable に残す」意味を言えるか
+- sync publish と outbox persist の役割差を説明できるか
+
+### Q32. Outbox table は domain event そのものと何が違いますか？
+**見たいポイント**
+- domain event は業務上の出来事
+- outbox は配送待ちの durable record
+- integration event へ発展する余地を理解しているか
+
+### Q33. Authentication と Authorization の違いは何ですか？
+**見たいポイント**
+- actor を組み立てることと、操作可否判定の違い
+- adapter と application の責務差を説明できるか
+- 401 と 403 の違いを言えるか
+
+### Q34. なぜ current actor は input adapter で組み立て、policy は application に置くのですか？
+**見たいポイント**
+- HTTP detail を内側へ漏らさないため
+- 入口ごとに認可ロジックを複製しないため
+- high-value order のように業務データが必要な判定があると説明できるか
+
 ---
 
 ## Part 6. 説明の深さを測る応用問題
 
-### Q31. この repo でまだ「本番向けには足りない」ところはどこですか？
+### Q35. この repo でまだ「本番向けには足りない」ところはどこですか？
 **見たいポイント**
-- auth
-- migration
-- outbox
 - saga
 - retry / timeout
 - observability
 - advanced validation
+- outbox dispatcher
+- audit log
 などを挙げられるか
 
-### Q32. この repo を次に1段階進化させるなら何を追加しますか？ なぜですか？
+### Q36. この repo を次に1段階進化させるなら何を追加しますか？ なぜですか？
 **見たいポイント**
-- PostgreSQL adapter
-- Outbox pattern
+- outbox dispatcher
 - 複数 payment adapter
-- auth / policy
 - query read model
+- integration event
+- policy composition
 など、目的付きで答えられるか
 
-### Q33. 「Controller に業務ルールが入る」と何がつらいのですか？
+### Q37. 「Controller に業務ルールが入る」と何がつらいのですか？
 **見たいポイント**
 - 再利用できない
 - テストしづらい
 - 入口ごとにロジックが散る
 - 変更影響が広がる
 
-### Q34. Ubiquitous Language はなぜ DDD の出発点なのですか？
+### Q38. Ubiquitous Language はなぜ DDD の出発点なのですか？
 **見たいポイント**
 - docs と code と会話の意味を揃えるためだと言えるか
 - `Order`, `Payment`, `Money` を混同しない意義を説明できるか
 
-### Q35. なぜ `Order` を aggregate root と見なすのですか？
+### Q39. なぜ `Order` を aggregate root と見なすのですか？
 **見たいポイント**
 - 一貫性境界
 - repository が aggregate 単位である理由
 - `OrderLine` は内部要素であり、`Payment` は外側 detail だと言えるか
 
-### Q36. 「なんでも interface 化する」のはなぜダメですか？
+### Q40. 「なんでも interface 化する」のはなぜダメですか？
 **見たいポイント**
 - 変わらないものまで抽象化すると儀式になる
 - 学習コストや複雑さが上がる
 - 境界は痛いところから切るべきだと理解しているか
 
-### Q37. 「この案件はフル採用すべきではない」と説明してください
+### Q41. 「この案件はフル採用すべきではない」と説明してください
 **見たいポイント**
 - 非採用や部分採用の理由を言えるか
 - 設計は目的でなく手段だと理解しているか

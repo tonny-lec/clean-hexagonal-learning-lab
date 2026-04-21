@@ -1,11 +1,16 @@
 import type { OrderRepositoryPort, StoredOrderRecord } from '../../application/ports/order-repository-port.js';
+import type { TransactionContext } from '../../application/ports/unit-of-work-port.js';
 import type { Order } from '../../domain/order.js';
 
 export class InMemoryOrderRepository implements OrderRepositoryPort {
   private readonly orders = new Map<string, Order>();
   private readonly ordersByIdempotencyKey = new Map<string, StoredOrderRecord>();
 
-  async save(order: Order, options?: { idempotencyKey?: string; paymentConfirmationId?: string }): Promise<void> {
+  async save(
+    order: Order,
+    options?: { idempotencyKey?: string; paymentConfirmationId?: string },
+    _transaction?: TransactionContext,
+  ): Promise<void> {
     this.orders.set(order.id, order);
 
     if (options?.idempotencyKey) {

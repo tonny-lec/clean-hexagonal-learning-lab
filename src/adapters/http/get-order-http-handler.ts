@@ -1,6 +1,7 @@
 import { ApplicationError, InvalidHttpRequestError } from '../../application/errors/application-error.js';
 import type { OrderSummaryDto } from '../../application/dto/order-dto.js';
 import type { GetOrderSummaryQuery } from '../../application/use-cases/get-order-summary.js';
+import { requireHttpActor } from './auth-middleware.js';
 
 export type HttpResponse<TBody> = {
   status: number;
@@ -8,7 +9,7 @@ export type HttpResponse<TBody> = {
 };
 
 export async function handleGetOrderHttp(
-  request: { params?: Record<string, string | undefined> },
+  request: { params?: Record<string, string | undefined>; headers?: Record<string, string | undefined> },
   execute: (query: GetOrderSummaryQuery) => Promise<OrderSummaryDto>,
 ): Promise<HttpResponse<OrderSummaryDto | { error: string; message: string }>> {
   try {
@@ -17,7 +18,8 @@ export async function handleGetOrderHttp(
       throw new InvalidHttpRequestError('orderId route parameter is required.');
     }
 
-    const result = await execute({ orderId });
+    const actor = requireHttpActor(request.headers);
+    const result = await execute({ orderId, actor });
     return { status: 200, body: result };
   } catch (error) {
     if (error instanceof ApplicationError) {

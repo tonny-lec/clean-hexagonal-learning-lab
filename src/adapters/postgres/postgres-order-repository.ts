@@ -1,7 +1,8 @@
 import type { QueryResult, QueryResultRow } from 'pg';
+import type { OrderRepositoryPort, StoredOrderRecord } from '../../application/ports/order-repository-port.js';
+import type { TransactionContext } from '../../application/ports/unit-of-work-port.js';
 import { Money } from '../../domain/money.js';
 import { Order } from '../../domain/order.js';
-import type { OrderRepositoryPort, StoredOrderRecord } from '../../application/ports/order-repository-port.js';
 
 type Queryable = {
   query<T extends QueryResultRow = QueryResultRow>(text: string, params?: unknown[]): Promise<QueryResult<T>>;
@@ -23,7 +24,12 @@ type StoredOrderPayload = {
 export class PostgresOrderRepository implements OrderRepositoryPort {
   constructor(private readonly db: Queryable) {}
 
-  async save(order: Order, options?: { idempotencyKey?: string; paymentConfirmationId?: string }): Promise<void> {
+  async save(
+    order: Order,
+    options?: { idempotencyKey?: string; paymentConfirmationId?: string },
+    transaction?: TransactionContext,
+  ): Promise<void> {
+    const executor = this.resolveExecutor(transaction);
     const payload: StoredOrderPayload = {
       id: order.id,
       customerId: order.customerId,
@@ -34,7 +40,7 @@ export class PostgresOrderRepository implements OrderRepositoryPort {
       })),
     };
 
-    await this.db.query(
+    await executor.query(
       `INSERT INTO orders (id, customer_id, payload_json)
        VALUES ($1, $2, $3::jsonb)
        ON CONFLICT (id)
@@ -46,7 +52,7 @@ export class PostgresOrderRepository implements OrderRepositoryPort {
     );
 
     if (options?.idempotencyKey) {
-      await this.db.query(
+      await executor.query(
         `INSERT INTO idempotency_records (idempotency_key, order_id, payment_confirmation_id)
          VALUES ($1, $2, $3)
          ON CONFLICT (idempotency_key)
@@ -85,6 +91,10 @@ export class PostgresOrderRepository implements OrderRepositoryPort {
       order: this.deserialize(row.payload_json),
       paymentConfirmationId: row.payment_confirmation_id ?? undefined,
     };
+  }
+
+  private resolveExecutor(transaction?: TransactionContext): Queryable {
+    return (transaction as Queryable | undefined) ?? this.db;
   }
 
   private deserialize(payload: unknown): Order {

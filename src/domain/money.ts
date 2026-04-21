@@ -33,6 +33,11 @@ export class Money {
     return new Money(this.amountInMinor * quantity, this.currency);
   }
 
+  isGreaterThan(other: Money): boolean {
+    this.assertSameCurrency(other);
+    return this.amountInMinor > other.amountInMinor;
+  }
+
   toJSON(): { amountInMinor: number; currency: string } {
     return {
       amountInMinor: this.amountInMinor,
