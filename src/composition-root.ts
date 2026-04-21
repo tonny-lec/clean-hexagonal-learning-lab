@@ -1,20 +1,23 @@
+import { OrderAuthorizationPolicy } from './application/policies/order-authorization-policy.js';
+import { pollOutbox } from './application/use-cases/poll-outbox.js';
 import { BrokerLikeIntegrationEventPublisher } from './adapters/broker-like/broker-like-integration-event-publisher.js';
 import { ConsoleAuditLog } from './adapters/console/console-audit-log.js';
 import { ConsoleIntegrationEventPublisher } from './adapters/console/console-integration-event-publisher.js';
 import { ConsoleObservability } from './adapters/console/console-observability.js';
-import { InMemoryOrderRepository } from './adapters/in-memory/in-memory-order-repository.js';
+import { ConsolePaymentGateway } from './adapters/console/console-payment-gateway.js';
+import { InMemoryDeliveryTriggerConsumer } from './adapters/in-memory/in-memory-delivery-trigger-consumer.js';
 import { InMemoryOrderReadModel } from './adapters/in-memory/in-memory-order-read-model.js';
+import { InMemoryOrderRepository } from './adapters/in-memory/in-memory-order-repository.js';
 import { InMemoryOutbox } from './adapters/in-memory/in-memory-outbox.js';
 import { NoopUnitOfWork } from './adapters/in-memory/noop-unit-of-work.js';
 import { StaticProductCatalog } from './adapters/in-memory/static-product-catalog.js';
-import { FanOutIntegrationEventSubscriber } from './adapters/subscribers/fan-out-integration-event-subscriber.js';
-import { OrderSummaryProjectorSubscriber } from './adapters/subscribers/order-summary-projector-subscriber.js';
-import { ConsolePaymentGateway } from './adapters/console/console-payment-gateway.js';
 import { FakePaymentGateway } from './adapters/payment/fake-payment-gateway.js';
 import { FailingPaymentGateway } from './adapters/payment/failing-payment-gateway.js';
 import { StripeLikePaymentGateway } from './adapters/payment/stripe-like-payment-gateway.js';
+import { FanOutIntegrationEventSubscriber } from './adapters/subscribers/fan-out-integration-event-subscriber.js';
+import { OrderSummaryProjectorSubscriber } from './adapters/subscribers/order-summary-projector-subscriber.js';
+import { OutboxDeliveryWorker } from './adapters/worker/outbox-delivery-worker.js';
 import { Money } from './domain/money.js';
-import { OrderAuthorizationPolicy } from './application/policies/order-authorization-policy.js';
 
 function createPaymentGateway() {
   const mode = process.env.PAYMENT_GATEWAY ?? 'console';
@@ -64,6 +67,21 @@ export function createDemoDependencies() {
   });
   const observability = new ConsoleObservability();
   const auditLog = new ConsoleAuditLog();
+  const deliveryTriggerConsumer = new InMemoryDeliveryTriggerConsumer();
+  const deliveryWorker = new OutboxDeliveryWorker({
+    triggerConsumer: deliveryTriggerConsumer,
+    runPollOutbox: (command) =>
+      pollOutbox(command, {
+        outbox,
+        integrationEventPublisher,
+        integrationEventSubscriber,
+        orderReadModel,
+        observability,
+        auditLog,
+      }),
+    observability,
+    auditLog,
+  });
 
   return {
     catalog,
@@ -77,6 +95,8 @@ export function createDemoDependencies() {
     authorizationPolicy,
     observability,
     auditLog,
+    deliveryTriggerConsumer,
+    deliveryWorker,
     idGenerator: () => `order-${Math.random().toString(36).slice(2, 10)}`,
   };
 }

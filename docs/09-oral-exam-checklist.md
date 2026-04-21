@@ -256,7 +256,7 @@
 - pending message を運ぶ責務
 - business transaction の外で delivery を進めること
 - mark-as-published / retry / dead-letter の境界だと説明できるか
-- poller / worker から呼ばれる理由を言えるか
+- poller / dedicated worker / queue consumer から呼ばれる理由を言えるか
 
 ### Q36. domain event と integration event は何が違いますか？
 **見たいポイント**
@@ -280,25 +280,25 @@
 
 ### Q39. この repo でまだ「本番向けには足りない」ところはどこですか？
 **見たいポイント**
-- dedicated worker / scheduler 運用
 - real message broker / queue 連携
 - subscriber ごとの failure policy / replay
 - schema registry / contract governance
 - structured logging / metrics / tracing の強化
+- multi-node worker orchestration / concurrency control
 - advanced validation / rate limit / security hardening
 - 実 DB / 実外部認証 / 実決済接続
 などを挙げられるか
 
 ### Q40. この repo を次に1段階進化させるなら何を追加しますか？ なぜですか？
 **見たいポイント**
-- dedicated worker / cron / queue consumer
 - real broker adapter
 - subscriber replay / re-drive
 - contract compatibility check
 - policy composition
 - payment workflow の saga 化
 - observability の structured 化
-など、**Sprint 6 の実装済み要素の次** を目的付きで答えられるか
+- worker concurrency / scheduler 強化
+など、**Sprint 7 の実装済み要素の次** を目的付きで答えられるか
 
 ### Q41. 「Controller に業務ルールが入る」と何がつらいのですか？
 **見たいポイント**

@@ -1,11 +1,11 @@
 import { runPlaceOrderBatch } from './adapters/batch/place-order-batch.js';
 import { runGetOrderCli, runPlaceOrderCli } from './adapters/cli/order-cli.js';
 import { startDemoHttpServer } from './adapters/http/create-demo-http-server.js';
+import type { IntegrationEventVersion } from './application/integration-events/order-integration-event.js';
 import { dispatchOutbox } from './application/use-cases/dispatch-outbox.js';
 import { getOrderSummary } from './application/use-cases/get-order-summary.js';
 import { pollOutbox } from './application/use-cases/poll-outbox.js';
 import { placeOrder } from './application/use-cases/place-order.js';
-import type { IntegrationEventVersion } from './application/integration-events/order-integration-event.js';
 import { createDemoDependencies } from './composition-root.js';
 
 const dependencies = createDemoDependencies();
@@ -25,14 +25,7 @@ if (mode === 'http') {
     JSON.stringify(
       await dispatchOutbox(
         { batchSize: 100, integrationEventVersions },
-        {
-          outbox: dependencies.outbox,
-          integrationEventPublisher: dependencies.integrationEventPublisher,
-          integrationEventSubscriber: dependencies.integrationEventSubscriber,
-          orderReadModel: dependencies.orderReadModel,
-          observability: dependencies.observability,
-          auditLog: dependencies.auditLog,
-        },
+        getDeliveryDependencies(),
       ),
       null,
       2,
@@ -59,15 +52,56 @@ if (mode === 'http') {
           maxAttempts: 3,
           integrationEventVersions,
         },
-        {
-          outbox: dependencies.outbox,
-          integrationEventPublisher: dependencies.integrationEventPublisher,
-          integrationEventSubscriber: dependencies.integrationEventSubscriber,
-          orderReadModel: dependencies.orderReadModel,
-          observability: dependencies.observability,
-          auditLog: dependencies.auditLog,
-        },
+        getDeliveryDependencies(),
       ),
+      null,
+      2,
+    ),
+  );
+} else if (mode === 'worker') {
+  const placed = await placeOrder(
+    {
+      actor: adminActor,
+      customerId: 'worker-demo',
+      items: [{ sku: 'BOOK', quantity: 1 }],
+      idempotencyKey: 'worker-demo-key',
+    },
+    dependencies,
+  );
+
+  const requestedAt = new Date().toISOString();
+  const trigger = dependencies.deliveryTriggerConsumer.enqueue({
+    kind: 'queue-message',
+    requestedAt,
+  });
+
+  const workerRun = await dependencies.deliveryWorker.runUntilIdle({
+    defaultCommand: {
+      batchSize: 100,
+      cycles: 3,
+      startAt: requestedAt,
+      stepSeconds: 61,
+      retryDelaySeconds: 60,
+      maxAttempts: 3,
+      integrationEventVersions,
+    },
+  });
+
+  const summary = await getOrderSummary(
+    { orderId: placed.orderId, actor: adminActor },
+    {
+      orderReadModel: dependencies.orderReadModel,
+      authorizationPolicy: dependencies.authorizationPolicy,
+    },
+  );
+
+  console.log(
+    JSON.stringify(
+      {
+        trigger,
+        workerRun,
+        summary,
+      },
       null,
       2,
     ),
@@ -104,14 +138,7 @@ if (mode === 'http') {
   );
   await dispatchOutbox(
     { batchSize: 100, integrationEventVersions },
-    {
-      outbox: dependencies.outbox,
-      integrationEventPublisher: dependencies.integrationEventPublisher,
-      integrationEventSubscriber: dependencies.integrationEventSubscriber,
-      orderReadModel: dependencies.orderReadModel,
-      observability: dependencies.observability,
-      auditLog: dependencies.auditLog,
-    },
+    getDeliveryDependencies(),
   );
   console.log(`Created ${placed.orderId}`);
   console.log(
@@ -150,4 +177,15 @@ function getConfiguredIntegrationEventVersions(): IntegrationEventVersion[] {
     .filter((version): version is IntegrationEventVersion => version === 'v1' || version === 'v2');
 
   return versions.length > 0 ? versions : ['v1'];
+}
+
+function getDeliveryDependencies() {
+  return {
+    outbox: dependencies.outbox,
+    integrationEventPublisher: dependencies.integrationEventPublisher,
+    integrationEventSubscriber: dependencies.integrationEventSubscriber,
+    orderReadModel: dependencies.orderReadModel,
+    observability: dependencies.observability,
+    auditLog: dependencies.auditLog,
+  };
 }
