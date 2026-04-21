@@ -11,8 +11,13 @@
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
+    "@types/pg": "^8.20.0",
+    "pg-mem": "^3.0.14",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "pg": "^8.20.0"
   }
 }

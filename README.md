@@ -60,6 +60,7 @@ Clean Architecture と Hexagonal Architecture を、**概念だけでなく、�
 - `docs/09-oral-exam-checklist.md`
 - `docs/10-priority-roadmap-clean-hexagonal-and-ddd.md`
 - `docs/11-p1-implementation-breakdown.md`
+- `docs/11-postgres-and-migrations.md`
 - `docs/14-aggregate-boundary.md`
 - `docs/18-ubiquitous-language.md`
 
@@ -80,6 +81,7 @@ Clean Architecture と Hexagonal Architecture を、**概念だけでなく、�
 - `tests/get-order-summary.test.ts`
 - `tests/http-adapter.test.ts`
 - `tests/sqlite-order-repository.test.ts`
+- `tests/postgres-order-repository.test.ts`
 - `tests/multiple-entrypoints.test.ts`
 
 ---
@@ -132,10 +134,13 @@ clean-hexagonal-learning-lab/
       console/
       http/
       in-memory/
+      postgres/
       presenters/
       sqlite/
     composition-root.ts
     index.ts
+  db/
+    migrations/
   tests/
 ```
 
