@@ -17,6 +17,13 @@ export type OrderLine = {
   unitPrice: Money;
 };
 
+/**
+ * Aggregate Root for the order consistency boundary in this learning project.
+ *
+ * - External callers create or rehydrate the aggregate through Order.
+ * - OrderLine lives inside the aggregate boundary.
+ * - Payment and persistence stay outside and are coordinated through ports/use cases.
+ */
 export class Order {
   private readonly domainEvents: OrderPlacedEvent[];
 
