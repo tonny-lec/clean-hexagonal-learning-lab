@@ -3,9 +3,10 @@ import { InMemoryOrderReadModel } from '../src/adapters/in-memory/in-memory-orde
 import { FanOutIntegrationEventSubscriber } from '../src/adapters/subscribers/fan-out-integration-event-subscriber.js';
 import { OrderSummaryProjectorSubscriber } from '../src/adapters/subscribers/order-summary-projector-subscriber.js';
 import type { OrderPlacedIntegrationEvent } from '../src/application/integration-events/order-integration-event.js';
-import type { IntegrationEventSubscriberPort } from '../src/application/ports/integration-event-subscriber-port.js';
+import type { NamedIntegrationEventSubscriberPort } from '../src/application/ports/named-integration-event-subscriber-port.js';
 
-class RecordingSubscriber implements IntegrationEventSubscriberPort {
+class RecordingSubscriber implements NamedIntegrationEventSubscriberPort {
+  readonly subscriberName = 'recording-subscriber';
   readonly handled: OrderPlacedIntegrationEvent[] = [];
 
   async handle(event: OrderPlacedIntegrationEvent): Promise<void> {

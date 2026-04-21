@@ -5,6 +5,7 @@ import { InMemoryIntegrationEventPublisher } from '../src/adapters/in-memory/in-
 import { InMemoryObservability } from '../src/adapters/in-memory/in-memory-observability.js';
 import { InMemoryOrderReadModel } from '../src/adapters/in-memory/in-memory-order-read-model.js';
 import { InMemoryOutbox } from '../src/adapters/in-memory/in-memory-outbox.js';
+import { OrderSummaryProjectorSubscriber } from '../src/adapters/subscribers/order-summary-projector-subscriber.js';
 import { OutboxDeliveryWorker } from '../src/adapters/worker/outbox-delivery-worker.js';
 import { pollOutbox } from '../src/application/use-cases/poll-outbox.js';
 
@@ -38,7 +39,7 @@ describe('OutboxDeliveryWorker', () => {
         pollOutbox(command, {
           outbox,
           integrationEventPublisher: publisher,
-          orderReadModel: readModel,
+          integrationEventSubscriber: new OrderSummaryProjectorSubscriber(readModel),
         }),
       observability,
       auditLog,

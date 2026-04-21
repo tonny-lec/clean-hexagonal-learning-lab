@@ -6,6 +6,7 @@ import { dispatchOutbox } from './application/use-cases/dispatch-outbox.js';
 import { getOrderSummary } from './application/use-cases/get-order-summary.js';
 import { pollOutbox } from './application/use-cases/poll-outbox.js';
 import { placeOrder } from './application/use-cases/place-order.js';
+import { replaySubscriberFailures } from './application/use-cases/replay-subscriber-failures.js';
 import { createDemoDependencies } from './composition-root.js';
 
 const dependencies = createDemoDependencies();
@@ -101,6 +102,86 @@ if (mode === 'http') {
         trigger,
         workerRun,
         summary,
+      },
+      null,
+      2,
+    ),
+  );
+} else if (mode === 'replay') {
+  const placed = await placeOrder(
+    {
+      actor: adminActor,
+      customerId: 'replay-demo',
+      items: [{ sku: 'BOOK', quantity: 1 }],
+      idempotencyKey: 'replay-demo-key',
+    },
+    dependencies,
+  );
+
+  const dispatchResult = await dispatchOutbox(
+    {
+      batchSize: 100,
+      integrationEventVersions,
+      now: '2030-01-01T00:00:00.000Z',
+    },
+    getDeliveryDependencies(),
+  );
+
+  const beforeReplay = await getOrderSummary(
+    { orderId: placed.orderId, actor: adminActor },
+    {
+      orderReadModel: dependencies.orderReadModel,
+      authorizationPolicy: dependencies.authorizationPolicy,
+    },
+  ).then(
+    (summary) => ({ status: 'available' as const, summary }),
+    (error) => ({ status: 'missing' as const, error: error instanceof Error ? error.message : 'unknown-error' }),
+  );
+
+  const replayableBefore = structuredClone(
+    await dependencies.subscriberFailureStore.listReplayable(100, '2030-01-01T00:01:01.000Z'),
+  );
+
+  const replayResult = await replaySubscriberFailures(
+    {
+      batchSize: 100,
+      now: '2030-01-01T00:01:01.000Z',
+    },
+    {
+      failureStore: dependencies.subscriberFailureStore,
+      subscribers: dependencies.integrationEventSubscribers,
+      failurePolicy: dependencies.subscriberFailurePolicy,
+      observability: dependencies.observability,
+      auditLog: dependencies.auditLog,
+    },
+  );
+
+  const replayableAfter = await dependencies.subscriberFailureStore.listReplayable(100, '2030-01-01T00:02:02.000Z');
+  const deadLettersAfter = await dependencies.subscriberFailureStore.listDeadLetters(100);
+
+  const afterReplay = await getOrderSummary(
+    { orderId: placed.orderId, actor: adminActor },
+    {
+      orderReadModel: dependencies.orderReadModel,
+      authorizationPolicy: dependencies.authorizationPolicy,
+    },
+  ).then(
+    (summary) => ({ status: 'available' as const, summary }),
+    (error) => ({ status: 'missing' as const, error: error instanceof Error ? error.message : 'unknown-error' }),
+  );
+
+  console.log(
+    JSON.stringify(
+      {
+        dispatchResult,
+        subscriberFailures: {
+          replayableBefore,
+          replayableAfter,
+          deadLettersAfter,
+        },
+        beforeReplay,
+        replayResult,
+        afterReplay,
       },
       null,
       2,

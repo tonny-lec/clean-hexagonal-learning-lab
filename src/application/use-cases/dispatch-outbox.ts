@@ -1,4 +1,3 @@
-import type { OrderSummaryDto } from '../dto/order-dto.js';
 import type { AuditLogPort } from '../ports/audit-log-port.js';
 import type { IntegrationEventPublisherPort } from '../ports/integration-event-publisher-port.js';
 import type { IntegrationEventSubscriberPort } from '../ports/integration-event-subscriber-port.js';
@@ -56,41 +55,6 @@ export async function dispatchOutbox(
   for (const message of pendingMessages) {
     const integrationEvents = toOrderPlacedIntegrationEvents(message, integrationEventVersions);
     const primaryEvent = integrationEvents[0];
-    const summary: OrderSummaryDto = {
-      orderId: message.payload.orderId,
-      customerId: message.payload.customerId,
-      lines: message.payload.lines,
-      totalAmount: message.payload.totalAmount,
-    };
-
-    try {
-      if (dependencies.integrationEventSubscriber) {
-        for (const event of integrationEvents) {
-          await dependencies.integrationEventSubscriber.handle(event);
-        }
-      } else if (dependencies.orderReadModel) {
-        await dependencies.orderReadModel.upsert(summary);
-      }
-    } catch (error) {
-      failedCount += 1;
-      await dependencies.observability?.record('outbox.projection.failed', {
-        outboxMessageId: message.id,
-        aggregateId: message.aggregateId,
-        error: error instanceof Error ? error.message : 'unknown-error',
-      });
-      const deadLettered = await handleDeliveryFailure({
-        message,
-        now,
-        maxAttempts,
-        retryDelaySeconds,
-        dependencies,
-        error,
-      });
-      if (deadLettered) {
-        deadLetteredCount += 1;
-      }
-      continue;
-    }
 
     try {
       await dependencies.integrationEventPublisher.publish(integrationEvents);
@@ -146,6 +110,21 @@ export async function dispatchOutbox(
         aggregateId: message.aggregateId,
         error: error instanceof Error ? error.message : 'unknown-error',
       });
+    }
+
+    try {
+      if (dependencies.integrationEventSubscriber) {
+        for (const event of integrationEvents) {
+          await dependencies.integrationEventSubscriber.handle(event);
+        }
+      }
+    } catch (error) {
+      await dependencies.observability?.record('subscriber.delivery.blocked', {
+        outboxMessageId: message.id,
+        aggregateId: message.aggregateId,
+        error: error instanceof Error ? error.message : 'unknown-error',
+      });
+      throw error;
     }
   }
 

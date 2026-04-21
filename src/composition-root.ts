@@ -9,14 +9,17 @@ import { InMemoryDeliveryTriggerConsumer } from './adapters/in-memory/in-memory-
 import { InMemoryOrderReadModel } from './adapters/in-memory/in-memory-order-read-model.js';
 import { InMemoryOrderRepository } from './adapters/in-memory/in-memory-order-repository.js';
 import { InMemoryOutbox } from './adapters/in-memory/in-memory-outbox.js';
+import { InMemorySubscriberDeliveryFailureStore } from './adapters/in-memory/in-memory-subscriber-delivery-failure-store.js';
 import { NoopUnitOfWork } from './adapters/in-memory/noop-unit-of-work.js';
 import { StaticProductCatalog } from './adapters/in-memory/static-product-catalog.js';
 import { NatsIntegrationEventPublisher } from './adapters/nats/nats-integration-event-publisher.js';
 import { FakePaymentGateway } from './adapters/payment/fake-payment-gateway.js';
 import { FailingPaymentGateway } from './adapters/payment/failing-payment-gateway.js';
 import { StripeLikePaymentGateway } from './adapters/payment/stripe-like-payment-gateway.js';
+import { FailOnceIntegrationEventSubscriber } from './adapters/subscribers/fail-once-integration-event-subscriber.js';
 import { FanOutIntegrationEventSubscriber } from './adapters/subscribers/fan-out-integration-event-subscriber.js';
 import { OrderSummaryProjectorSubscriber } from './adapters/subscribers/order-summary-projector-subscriber.js';
+import { StaticSubscriberFailurePolicy } from './adapters/subscribers/static-subscriber-failure-policy.js';
 import { OutboxDeliveryWorker } from './adapters/worker/outbox-delivery-worker.js';
 import { Money } from './domain/money.js';
 
@@ -68,16 +71,33 @@ export function createDemoDependencies() {
   });
   const paymentGateway = createPaymentGateway();
   const integrationEventPublisher = createIntegrationEventPublisher();
-  const integrationEventSubscriber = new FanOutIntegrationEventSubscriber([
-    new OrderSummaryProjectorSubscriber(orderReadModel),
-  ]);
+  const subscriberFailureStore = new InMemorySubscriberDeliveryFailureStore();
+  const subscriberFailurePolicy = new StaticSubscriberFailurePolicy({
+    'order-summary-projector': { maxAttempts: 3, retryDelaySeconds: 60 },
+  });
+  const observability = new ConsoleObservability();
+  const auditLog = new ConsoleAuditLog();
+  const projectorSubscriber = new OrderSummaryProjectorSubscriber(orderReadModel);
+  const integrationEventSubscribers = [
+    process.env.SUBSCRIBER_FAILURE_MODE === 'order-summary-projector-fail-once'
+      ? new FailOnceIntegrationEventSubscriber(
+          projectorSubscriber.subscriberName,
+          projectorSubscriber,
+          'projector temporarily unavailable',
+        )
+      : projectorSubscriber,
+  ];
+  const integrationEventSubscriber = new FanOutIntegrationEventSubscriber(integrationEventSubscribers, {
+    failureStore: subscriberFailureStore,
+    failurePolicy: subscriberFailurePolicy,
+    observability,
+    auditLog,
+  });
   const outbox = new InMemoryOutbox();
   const unitOfWork = new NoopUnitOfWork();
   const authorizationPolicy = new OrderAuthorizationPolicy({
     highValueThreshold: Money.fromMinor(5000, 'JPY'),
   });
-  const observability = new ConsoleObservability();
-  const auditLog = new ConsoleAuditLog();
   const deliveryTriggerConsumer = new InMemoryDeliveryTriggerConsumer();
   const deliveryWorker = new OutboxDeliveryWorker({
     triggerConsumer: deliveryTriggerConsumer,
@@ -101,6 +121,9 @@ export function createDemoDependencies() {
     paymentGateway,
     integrationEventPublisher,
     integrationEventSubscriber,
+    integrationEventSubscribers,
+    subscriberFailureStore,
+    subscriberFailurePolicy,
     outbox,
     unitOfWork,
     authorizationPolicy,

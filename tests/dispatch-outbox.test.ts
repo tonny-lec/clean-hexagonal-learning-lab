@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { OrderSummaryDto } from '../src/application/dto/order-dto.js';
 import type { IntegrationEventSubscriberPort } from '../src/application/ports/integration-event-subscriber-port.js';
 import { InMemoryAuditLog } from '../src/adapters/in-memory/in-memory-audit-log.js';
 import { InMemoryIntegrationEventPublisher } from '../src/adapters/in-memory/in-memory-integration-event-publisher.js';
+import { FailOnceIntegrationEventSubscriber } from '../src/adapters/subscribers/fail-once-integration-event-subscriber.js';
+import { OrderSummaryProjectorSubscriber } from '../src/adapters/subscribers/order-summary-projector-subscriber.js';
 import { InMemoryObservability } from '../src/adapters/in-memory/in-memory-observability.js';
 import { InMemoryOrderReadModel } from '../src/adapters/in-memory/in-memory-order-read-model.js';
 import { InMemoryOutbox } from '../src/adapters/in-memory/in-memory-outbox.js';
@@ -20,19 +21,6 @@ class FailingIntegrationEventPublisher extends InMemoryIntegrationEventPublisher
     }
 
     await super.publish(events);
-  }
-}
-
-class FailOnceReadModel extends InMemoryOrderReadModel {
-  private shouldFail = true;
-
-  override async upsert(summary: OrderSummaryDto): Promise<void> {
-    if (this.shouldFail) {
-      this.shouldFail = false;
-      throw new Error('read model unavailable');
-    }
-
-    await super.upsert(summary);
   }
 }
 
@@ -83,7 +71,7 @@ describe('dispatchOutbox', () => {
       {
         outbox,
         integrationEventPublisher: publisher,
-        orderReadModel: readModel,
+        integrationEventSubscriber: new OrderSummaryProjectorSubscriber(readModel),
         observability,
         auditLog,
       },
@@ -145,7 +133,7 @@ describe('dispatchOutbox', () => {
       {
         outbox,
         integrationEventPublisher: publisher,
-        orderReadModel: readModel,
+        integrationEventSubscriber: new OrderSummaryProjectorSubscriber(readModel),
         observability,
       },
     );
@@ -173,7 +161,7 @@ describe('dispatchOutbox', () => {
       {
         outbox,
         integrationEventPublisher: publisher,
-        orderReadModel: readModel,
+        integrationEventSubscriber: new OrderSummaryProjectorSubscriber(readModel),
         observability,
       },
     );
@@ -209,7 +197,7 @@ describe('dispatchOutbox', () => {
       {
         outbox,
         integrationEventPublisher: publisher,
-        orderReadModel: readModel,
+        integrationEventSubscriber: new OrderSummaryProjectorSubscriber(readModel),
         observability,
         auditLog,
       },
@@ -240,10 +228,10 @@ describe('dispatchOutbox', () => {
     );
   });
 
-  it('retries delivery when the read model update fails before publish', async () => {
+  it('surfaces a blocking error when a subscriber boundary throws without a replay store', async () => {
     const outbox = new InMemoryOutbox();
     const publisher = new InMemoryIntegrationEventPublisher();
-    const readModel = new FailOnceReadModel();
+    const readModel = new InMemoryOrderReadModel();
     const observability = new InMemoryObservability();
 
     await outbox.save([
@@ -256,47 +244,34 @@ describe('dispatchOutbox', () => {
       },
     ]);
 
-    const first = await dispatchOutbox(
-      {
-        batchSize: 10,
-        now: '2030-01-01T00:00:00.000Z',
-        retryDelaySeconds: 60,
-      },
-      {
-        outbox,
-        integrationEventPublisher: publisher,
-        orderReadModel: readModel,
-        observability,
-      },
-    );
+    await expect(
+      dispatchOutbox(
+        {
+          batchSize: 10,
+          now: '2030-01-01T00:00:00.000Z',
+          retryDelaySeconds: 60,
+        },
+        {
+          outbox,
+          integrationEventPublisher: publisher,
+          integrationEventSubscriber: new FailOnceIntegrationEventSubscriber(
+            'order-summary-projector',
+            new OrderSummaryProjectorSubscriber(readModel),
+            'projector temporarily unavailable',
+          ),
+          observability,
+        },
+      ),
+    ).rejects.toThrow('projector temporarily unavailable');
 
-    expect(first).toEqual({ dispatchedCount: 0, failedCount: 1, deadLetteredCount: 0 });
-    expect(publisher.publishedEvents).toHaveLength(0);
-    expect(await outbox.listPending(10, '2030-01-01T00:00:30.000Z')).toEqual([]);
+    expect(publisher.publishedEvents).toHaveLength(1);
+    expect(await outbox.listPending(10, '2030-01-01T00:10:00.000Z')).toEqual([]);
     expect(observability.records).toContainEqual(
       expect.objectContaining({
-        name: 'outbox.projection.failed',
+        name: 'subscriber.delivery.blocked',
         attributes: expect.objectContaining({ aggregateId: 'order-projection-failure' }),
       }),
     );
-
-    const second = await dispatchOutbox(
-      {
-        batchSize: 10,
-        now: '2030-01-01T00:01:01.000Z',
-        retryDelaySeconds: 60,
-      },
-      {
-        outbox,
-        integrationEventPublisher: publisher,
-        orderReadModel: readModel,
-        observability,
-      },
-    );
-
-    expect(second).toEqual({ dispatchedCount: 1, failedCount: 0, deadLetteredCount: 0 });
-    expect(publisher.publishedEvents).toHaveLength(1);
-    expect(await outbox.listPending(10, '2030-01-01T00:10:00.000Z')).toEqual([]);
   });
 
   it('dead-letters the message instead of republishing when acknowledgement fails after publish', async () => {
@@ -323,7 +298,7 @@ describe('dispatchOutbox', () => {
       {
         outbox,
         integrationEventPublisher: publisher,
-        orderReadModel: readModel,
+        integrationEventSubscriber: new OrderSummaryProjectorSubscriber(readModel),
         observability,
       },
     );
@@ -352,7 +327,7 @@ describe('dispatchOutbox', () => {
       {
         outbox,
         integrationEventPublisher: publisher,
-        orderReadModel: readModel,
+        integrationEventSubscriber: new OrderSummaryProjectorSubscriber(readModel),
         observability,
       },
     );

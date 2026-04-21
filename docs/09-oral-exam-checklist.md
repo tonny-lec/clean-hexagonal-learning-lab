@@ -257,6 +257,7 @@
 - business transaction の外で delivery を進めること
 - mark-as-published / retry / dead-letter の境界だと説明できるか
 - poller / dedicated worker / queue consumer から呼ばれる理由を言えるか
+- publish success 後の subscriber failure は outbox retry と同じ箱で扱わないと説明できるか
 
 ### Q36. domain event と integration event は何が違いますか？
 **見たいポイント**
@@ -281,25 +282,25 @@
 
 ### Q39. この repo でまだ「本番向けには足りない」ところはどこですか？
 **見たいポイント**
-- subscriber ごとの failure policy / replay
 - durable consumer / consumer group / queue semantics の整理
 - schema registry / contract governance
 - structured logging / metrics / tracing の強化
 - multi-node worker orchestration / concurrency control
+- subscriber replay の運用 UI / tooling
 - advanced validation / rate limit / security hardening
 - 実 DB / 実外部認証 / 実決済接続
 などを挙げられるか
 
 ### Q40. この repo を次に1段階進化させるなら何を追加しますか？ なぜですか？
 **見たいポイント**
-- subscriber replay / re-drive
-- contract compatibility check
-- policy composition
+- structured logging / metrics / tracing
+- consumer group / durable consumer
 - payment workflow の saga 化
-- observability の structured 化
+- bounded context / ACL の整理
+- contract compatibility check
+- replay tooling / operator flow
 - worker concurrency / scheduler 強化
-- consumer failure policy
-など、**Sprint 8 の実装済み要素の次** を目的付きで答えられるか
+など、**Sprint 9 の実装済み要素の次** を目的付きで答えられるか
 
 ### Q41. 「Controller に業務ルールが入る」と何がつらいのですか？
 **見たいポイント**

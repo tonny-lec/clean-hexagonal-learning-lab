@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { InMemoryIntegrationEventPublisher } from '../src/adapters/in-memory/in-memory-integration-event-publisher.js';
 import { InMemoryOrderReadModel } from '../src/adapters/in-memory/in-memory-order-read-model.js';
 import { InMemoryOutbox } from '../src/adapters/in-memory/in-memory-outbox.js';
+import { OrderSummaryProjectorSubscriber } from '../src/adapters/subscribers/order-summary-projector-subscriber.js';
 import { pollOutbox } from '../src/application/use-cases/poll-outbox.js';
 
 class FailOncePublisher extends InMemoryIntegrationEventPublisher {
@@ -45,7 +46,7 @@ describe('pollOutbox', () => {
       {
         outbox,
         integrationEventPublisher: publisher,
-        orderReadModel: readModel,
+        integrationEventSubscriber: new OrderSummaryProjectorSubscriber(readModel),
       },
     );
 
@@ -87,7 +88,7 @@ describe('pollOutbox', () => {
       {
         outbox,
         integrationEventPublisher: publisher,
-        orderReadModel: readModel,
+        integrationEventSubscriber: new OrderSummaryProjectorSubscriber(readModel),
       },
     );
 
