@@ -2,6 +2,8 @@ import type { AuditLogPort } from '../ports/audit-log-port.js';
 import type { IntegrationEventPublisherPort } from '../ports/integration-event-publisher-port.js';
 import type { IntegrationEventSubscriberPort } from '../ports/integration-event-subscriber-port.js';
 import type { ObservabilityPort } from '../ports/observability-port.js';
+import type { TelemetryContextInput } from '../ports/telemetry-context.js';
+import { createTelemetryContext } from '../ports/telemetry-context.js';
 import type { OrderReadModelPort } from '../ports/order-read-model-port.js';
 import type { OutboxPort } from '../ports/outbox-port.js';
 import { toOrderPlacedIntegrationEvents } from '../integration-events/map-order-integration-event.js';
@@ -12,6 +14,7 @@ export type DispatchOutboxCommand = {
   retryDelaySeconds?: number;
   maxAttempts?: number;
   now?: string;
+  telemetry?: TelemetryContextInput;
   integrationEventVersions?: IntegrationEventVersion[];
 };
 
@@ -36,6 +39,7 @@ export async function dispatchOutbox(
   const retryDelaySeconds = command.retryDelaySeconds ?? 60;
   const maxAttempts = command.maxAttempts ?? 3;
   const now = command.now ?? new Date().toISOString();
+  const telemetryContext = createTelemetryContext(command.telemetry, { source: 'dispatcher' });
   const integrationEventVersions = command.integrationEventVersions ?? ['v1'];
   const pendingMessages = await dependencies.outbox.listPending(batchSize, now);
 
@@ -44,7 +48,7 @@ export async function dispatchOutbox(
       dispatchedCount: 0,
       failedCount: 0,
       deadLetteredCount: 0,
-    });
+    }, telemetryContext);
     return { dispatchedCount: 0, failedCount: 0, deadLetteredCount: 0 };
   }
 
@@ -66,6 +70,7 @@ export async function dispatchOutbox(
         maxAttempts,
         retryDelaySeconds,
         dependencies,
+        telemetryContext,
         error,
       });
       if (deadLettered) {
@@ -90,7 +95,7 @@ export async function dispatchOutbox(
         outboxMessageId: message.id,
         aggregateId: message.aggregateId,
         error: error instanceof Error ? error.message : 'unknown-error',
-      });
+      }, telemetryContext);
       continue;
     }
 
@@ -109,7 +114,7 @@ export async function dispatchOutbox(
       await dependencies.observability?.record('outbox.audit.failed', {
         aggregateId: message.aggregateId,
         error: error instanceof Error ? error.message : 'unknown-error',
-      });
+      }, telemetryContext);
     }
 
     try {
@@ -123,7 +128,7 @@ export async function dispatchOutbox(
         outboxMessageId: message.id,
         aggregateId: message.aggregateId,
         error: error instanceof Error ? error.message : 'unknown-error',
-      });
+      }, telemetryContext);
       throw error;
     }
   }
@@ -132,7 +137,7 @@ export async function dispatchOutbox(
     dispatchedCount,
     failedCount,
     deadLetteredCount,
-  });
+  }, telemetryContext);
 
   return {
     dispatchedCount,
@@ -151,10 +156,12 @@ async function handleDeliveryFailure(args: {
     observability?: ObservabilityPort;
     auditLog?: AuditLogPort;
   };
+  telemetryContext?: TelemetryContextInput;
   error: unknown;
 }): Promise<boolean> {
   const nextRetryCount = args.message.retryCount + 1;
   const deadLettered = nextRetryCount >= args.maxAttempts;
+  const telemetryContext = createTelemetryContext(args.telemetryContext, { source: 'dispatcher' });
   const nextAttemptAt = deadLettered ? null : new Date(Date.parse(args.now) + args.retryDelaySeconds * 1000).toISOString();
 
   await args.dependencies.outbox.markAsFailed(args.message.id, {
@@ -179,7 +186,7 @@ async function handleDeliveryFailure(args: {
       await args.dependencies.observability?.record('outbox.audit.failed', {
         aggregateId: args.message.aggregateId,
         error: auditError instanceof Error ? auditError.message : 'unknown-error',
-      });
+      }, telemetryContext);
     }
   }
 
@@ -189,7 +196,7 @@ async function handleDeliveryFailure(args: {
     retryCount: nextRetryCount,
     deadLettered,
     error: args.error instanceof Error ? args.error.message : 'unknown-error',
-  });
+  }, telemetryContext);
 
   return deadLettered;
 }

@@ -1,7 +1,7 @@
 import { ApplicationError, InvalidHttpRequestError } from '../../application/errors/application-error.js';
 import type { PlaceOrderResultDto } from '../../application/dto/order-dto.js';
 import type { PlaceOrderCommand } from '../../application/use-cases/place-order.js';
-import { requireHttpActor } from './auth-middleware.js';
+import { requireHttpActor, resolveHttpTelemetry } from './auth-middleware.js';
 
 export type HttpResponse<TBody> = {
   status: number;
@@ -15,7 +15,8 @@ export async function handlePlaceOrderHttp(
   try {
     const actor = requireHttpActor(request.headers);
     const parsed = parsePlaceOrderBody(request.body);
-    const result = await execute({ ...parsed, actor });
+    const telemetry = resolveHttpTelemetry(request.headers);
+    const result = await execute({ ...parsed, actor, telemetry });
     return { status: 201, body: result };
   } catch (error) {
     return mapHttpError(error);

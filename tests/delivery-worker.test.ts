@@ -23,6 +23,7 @@ describe('OutboxDeliveryWorker', () => {
     const trigger = triggerConsumer.enqueue({
       kind: 'queue-message',
       requestedAt: '2030-01-01T00:00:00.000Z',
+      correlationId: 'request-123',
       command: {
         batchSize: 10,
         cycles: 3,
@@ -40,6 +41,7 @@ describe('OutboxDeliveryWorker', () => {
           outbox,
           integrationEventPublisher: publisher,
           integrationEventSubscriber: new OrderSummaryProjectorSubscriber(readModel),
+          observability,
         }),
       observability,
       auditLog,
@@ -62,7 +64,26 @@ describe('OutboxDeliveryWorker', () => {
     await expect(readModel.findById('order-worker-1')).resolves.toEqual(
       expect.objectContaining({ orderId: 'order-worker-1' }),
     );
-    expect(observability.records.map((record) => record.name)).toContain('delivery-worker.processed');
+    expect(observability.records).toContainEqual(
+      expect.objectContaining({
+        name: 'delivery-worker.processed',
+        context: expect.objectContaining({
+          source: 'worker',
+          correlationId: 'request-123',
+          traceId: 'trace-request-123',
+        }),
+      }),
+    );
+    expect(observability.records).toContainEqual(
+      expect.objectContaining({
+        name: 'outbox.dispatch.completed',
+        context: expect.objectContaining({
+          source: 'worker',
+          correlationId: 'request-123',
+          traceId: 'trace-request-123',
+        }),
+      }),
+    );
     expect(auditLog.entries).toContainEqual(
       expect.objectContaining({
         action: 'delivery-worker-processed',

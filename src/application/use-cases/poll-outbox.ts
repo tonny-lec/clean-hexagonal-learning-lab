@@ -3,6 +3,7 @@ import type { IntegrationEventPublisherPort } from '../ports/integration-event-p
 import type { IntegrationEventSubscriberPort } from '../ports/integration-event-subscriber-port.js';
 import type { IntegrationEventVersion } from '../integration-events/order-integration-event.js';
 import type { ObservabilityPort } from '../ports/observability-port.js';
+import type { TelemetryContextInput } from '../ports/telemetry-context.js';
 import type { OrderReadModelPort } from '../ports/order-read-model-port.js';
 import type { OutboxPort } from '../ports/outbox-port.js';
 import { dispatchOutbox, type DispatchOutboxResult } from './dispatch-outbox.js';
@@ -14,6 +15,7 @@ export type PollOutboxCommand = {
   cycles?: number;
   startAt?: string;
   stepSeconds?: number;
+  telemetry?: TelemetryContextInput;
   integrationEventVersions?: IntegrationEventVersion[];
 };
 
@@ -47,6 +49,7 @@ export async function pollOutbox(
         retryDelaySeconds: command.retryDelaySeconds,
         maxAttempts: command.maxAttempts,
         now,
+        telemetry: command.telemetry,
         integrationEventVersions: command.integrationEventVersions,
       },
       dependencies,

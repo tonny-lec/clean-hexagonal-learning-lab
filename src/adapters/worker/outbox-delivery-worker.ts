@@ -1,5 +1,6 @@
 import type { AuditLogPort } from '../../application/ports/audit-log-port.js';
 import type { ObservabilityPort } from '../../application/ports/observability-port.js';
+import { createTelemetryContext } from '../../application/ports/telemetry-context.js';
 import type { PollOutboxCommand, PollOutboxResult } from '../../application/use-cases/poll-outbox.js';
 import type { DeliveryTriggerConsumer, DeliveryTriggerKind } from './delivery-trigger-consumer.js';
 
@@ -42,7 +43,12 @@ export class OutboxDeliveryWorker {
       return { status: 'idle' };
     }
 
-    const command = mergePollCommand(defaultCommand, trigger.command);
+    const telemetryContext = createTelemetryContext(trigger.command.telemetry, {
+      source: 'worker',
+      correlationId: trigger.correlationId ?? trigger.id,
+      traceId: trigger.traceId,
+    });
+    const command = mergePollCommand(defaultCommand, trigger.command, telemetryContext);
 
     try {
       const pollResult = await this.dependencies.runPollOutbox(command);
@@ -51,7 +57,7 @@ export class OutboxDeliveryWorker {
         triggerId: trigger.id,
         triggerKind: trigger.kind,
         totalCycles: pollResult.totalCycles,
-      });
+      }, telemetryContext);
       await appendAuditSafely(this.dependencies.auditLog, this.dependencies.observability, {
         action: 'delivery-worker-processed',
         aggregateId: trigger.id,
@@ -75,7 +81,7 @@ export class OutboxDeliveryWorker {
         triggerId: trigger.id,
         triggerKind: trigger.kind,
         error: reason,
-      });
+      }, telemetryContext);
       await appendAuditSafely(this.dependencies.auditLog, this.dependencies.observability, {
         action: 'delivery-worker-failed',
         aggregateId: trigger.id,
@@ -123,10 +129,15 @@ export class OutboxDeliveryWorker {
   }
 }
 
-function mergePollCommand(defaultCommand: PollOutboxCommand, commandFromTrigger: PollOutboxCommand): PollOutboxCommand {
+function mergePollCommand(
+  defaultCommand: PollOutboxCommand,
+  commandFromTrigger: PollOutboxCommand,
+  telemetryContext = createTelemetryContext(undefined, { source: 'worker' }),
+): PollOutboxCommand {
   return {
     ...defaultCommand,
     ...commandFromTrigger,
+    telemetry: createTelemetryContext(commandFromTrigger.telemetry, telemetryContext ?? defaultCommand.telemetry),
     integrationEventVersions: commandFromTrigger.integrationEventVersions ?? defaultCommand.integrationEventVersions,
   };
 }

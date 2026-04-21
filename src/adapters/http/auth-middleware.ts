@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import type { ActorDto, ActorRole } from '../../application/dto/actor-dto.js';
 import {
   AuthenticationRequiredApplicationError,
   InvalidHttpRequestError,
 } from '../../application/errors/application-error.js';
+import type { TelemetryContext } from '../../application/ports/telemetry-context.js';
 
 /**
  * Learning-only auth adapter.
@@ -33,4 +35,18 @@ export function requireHttpActor(headers?: Record<string, string | undefined>): 
   }
 
   return actor;
+}
+
+export function resolveHttpTelemetry(
+  headers?: Record<string, string | undefined>,
+  generateRequestId: () => string = randomUUID,
+): TelemetryContext {
+  const requestId = headers?.['x-request-id'] ?? generateRequestId();
+
+  return {
+    source: 'http',
+    requestId,
+    correlationId: requestId,
+    traceId: `trace-${requestId}`,
+  };
 }

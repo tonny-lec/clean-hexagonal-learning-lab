@@ -12,6 +12,8 @@ export class InMemoryDeliveryTriggerConsumer implements DeliveryTriggerConsumer 
       id: input.id ?? `delivery-trigger-${this.pendingTriggers.length + this.inFlight.size + 1}`,
       kind: input.kind,
       requestedAt: input.requestedAt,
+      ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+      ...(input.traceId ? { traceId: input.traceId } : {}),
       command: input.command ?? {},
       attempts: 0,
       lastError: null,

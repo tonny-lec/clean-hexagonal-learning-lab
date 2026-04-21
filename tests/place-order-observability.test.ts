@@ -19,6 +19,12 @@ describe('placeOrder observability', () => {
         customerId: 'customer-1',
         items: [{ sku: 'BOOK', quantity: 1 }],
         idempotencyKey: 'obs-1',
+        telemetry: {
+          source: 'http',
+          requestId: 'request-1',
+          correlationId: 'request-1',
+          traceId: 'trace-request-1',
+        },
       },
       {
         catalog: {
@@ -45,6 +51,21 @@ describe('placeOrder observability', () => {
       'order.place.started',
       'order.place.completed',
     ]);
+    expect(observability.records).toContainEqual(
+      expect.objectContaining({
+        name: 'order.place.started',
+        context: {
+          source: 'http',
+          requestId: 'request-1',
+          correlationId: 'request-1',
+          traceId: 'trace-request-1',
+        },
+      }),
+    );
+    expect(observability.counters).toMatchObject({
+      'order.place.started': 1,
+      'order.place.completed': 1,
+    });
     expect(auditLog.entries).toHaveLength(1);
     expect(auditLog.entries[0]).toMatchObject({
       action: 'order-placed',

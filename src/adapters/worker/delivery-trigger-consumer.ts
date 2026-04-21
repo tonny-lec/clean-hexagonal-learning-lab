@@ -6,6 +6,8 @@ export type DeliveryTrigger = {
   id: string;
   kind: DeliveryTriggerKind;
   requestedAt: string;
+  correlationId?: string;
+  traceId?: string;
   command: PollOutboxCommand;
   attempts: number;
   lastError: string | null;
@@ -15,6 +17,8 @@ export type EnqueueDeliveryTriggerInput = {
   id?: string;
   kind: DeliveryTriggerKind;
   requestedAt: string;
+  correlationId?: string;
+  traceId?: string;
   command?: PollOutboxCommand;
 };
 

@@ -2,12 +2,15 @@ import type { AuditLogPort } from '../ports/audit-log-port.js';
 import type { OrderPlacedIntegrationEvent } from '../integration-events/order-integration-event.js';
 import type { NamedIntegrationEventSubscriberPort } from '../ports/named-integration-event-subscriber-port.js';
 import type { ObservabilityPort } from '../ports/observability-port.js';
+import type { TelemetryContextInput } from '../ports/telemetry-context.js';
+import { createTelemetryContext } from '../ports/telemetry-context.js';
 import type { SubscriberDeliveryFailureStorePort } from '../ports/subscriber-delivery-failure-store-port.js';
 import type { SubscriberFailurePolicyPort } from '../ports/subscriber-failure-policy-port.js';
 
 export type ReplaySubscriberFailuresCommand = {
   batchSize?: number;
   now?: string;
+  telemetry?: TelemetryContextInput;
 };
 
 export type ReplaySubscriberFailuresResult = {
@@ -27,6 +30,7 @@ export async function replaySubscriberFailures(
   },
 ): Promise<ReplaySubscriberFailuresResult> {
   const now = command.now ?? new Date().toISOString();
+  const telemetryContext = createTelemetryContext(command.telemetry, { source: 'subscriber-replay' });
   const failures = await dependencies.failureStore.listReplayable(command.batchSize, now);
 
   let replayedCount = 0;
@@ -47,6 +51,7 @@ export async function replaySubscriberFailures(
         failureStore: dependencies.failureStore,
         failurePolicy: dependencies.failurePolicy,
         observability: dependencies.observability,
+        telemetryContext: telemetryContext,
       });
       continue;
     }
@@ -58,7 +63,7 @@ export async function replaySubscriberFailures(
       await dependencies.observability?.record('subscriber.delivery.replayed', {
         subscriberName: failure.subscriberName,
         orderId: failure.event.orderId,
-      });
+      }, telemetryContext);
       await appendAuditSafely(dependencies.auditLog, dependencies.observability, {
         action: 'subscriber-delivery-replayed',
         aggregateId: failure.subscriberName,
@@ -77,6 +82,7 @@ export async function replaySubscriberFailures(
         failureStore: dependencies.failureStore,
         failurePolicy: dependencies.failurePolicy,
         observability: dependencies.observability,
+        telemetryContext: telemetryContext,
       });
 
       if (deadLettered) {
@@ -108,8 +114,10 @@ async function markFailureForRetry(args: {
   failureStore: SubscriberDeliveryFailureStorePort;
   failurePolicy: SubscriberFailurePolicyPort;
   observability?: ObservabilityPort;
+  telemetryContext?: TelemetryContextInput;
 }): Promise<boolean> {
   const policy = args.failurePolicy.getPolicy(args.failure.subscriberName);
+  const telemetryContext = createTelemetryContext(args.telemetryContext, { source: 'subscriber-replay' });
   const nextRetryCount = args.failure.retryCount + 1;
   const deadLettered = nextRetryCount >= policy.maxAttempts;
   const nextAttemptAt = deadLettered
@@ -130,6 +138,7 @@ async function markFailureForRetry(args: {
       retryCount: nextRetryCount,
       error: args.errorMessage,
     },
+    telemetryContext,
   );
 
   return deadLettered;

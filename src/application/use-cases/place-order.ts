@@ -1,5 +1,7 @@
 import type { PlaceOrderResultDto } from '../dto/order-dto.js';
 import type { ActorDto } from '../dto/actor-dto.js';
+import type { TelemetryContextInput } from '../ports/telemetry-context.js';
+import { createTelemetryContext } from '../ports/telemetry-context.js';
 import {
   ExternalServiceError,
   InvalidRequestApplicationError,
@@ -17,6 +19,7 @@ import { Order } from '../../domain/order.js';
 
 export type PlaceOrderCommand = {
   actor?: ActorDto;
+  telemetry?: TelemetryContextInput;
   customerId: string;
   items: Array<{
     sku: string;
@@ -45,10 +48,12 @@ export async function placeOrder(
     throw new InvalidRequestApplicationError('customerId is required.');
   }
 
+  const telemetryContext = createTelemetryContext(command.telemetry, { source: 'application.place-order' });
+
   await dependencies.observability?.record('order.place.started', {
     customerId: command.customerId,
     idempotencyKey: command.idempotencyKey ?? null,
-  });
+  }, telemetryContext);
 
   if (command.idempotencyKey && dependencies.orderRepository.findByIdempotencyKey) {
     const existingRecord = await dependencies.orderRepository.findByIdempotencyKey(command.idempotencyKey);
@@ -62,7 +67,7 @@ export async function placeOrder(
       await dependencies.observability?.record('order.place.completed', {
         orderId: existingRecord.order.id,
         reused: true,
-      });
+      }, telemetryContext);
 
       return {
         orderId: existingRecord.order.id,
@@ -128,7 +133,7 @@ export async function placeOrder(
     await dependencies.observability?.record('order.place.completed', {
       orderId: order.id,
       reused: false,
-    });
+    }, telemetryContext);
 
     return {
       orderId: order.id,
@@ -139,7 +144,7 @@ export async function placeOrder(
     await dependencies.observability?.record('order.place.failed', {
       customerId: command.customerId,
       error: error instanceof Error ? error.message : 'unknown-error',
-    });
+    }, telemetryContext);
 
     if (error instanceof DomainValidationError || error instanceof InvalidRequestApplicationError) {
       throw new InvalidRequestApplicationError(error.message, { cause: error });

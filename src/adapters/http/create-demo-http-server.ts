@@ -8,6 +8,7 @@ import { dispatchOutbox } from '../../application/use-cases/dispatch-outbox.js';
 import { getOrderSummary } from '../../application/use-cases/get-order-summary.js';
 import type { PlaceOrderDependencies } from '../../application/use-cases/place-order.js';
 import { placeOrder } from '../../application/use-cases/place-order.js';
+import { resolveHttpTelemetry } from './auth-middleware.js';
 import { handleDispatchOutboxHttp } from './dispatch-outbox-http-handler.js';
 import { handleGetOrderHttp } from './get-order-http-handler.js';
 import { handlePlaceOrderHttp } from './place-order-http-handler.js';
@@ -34,6 +35,7 @@ export function createDemoHttpServer(dependencies: PlaceOrderDependencies & {
         dispatchOutbox(
           {
             ...command,
+            telemetry: resolveHttpTelemetry(headers),
             integrationEventVersions: getConfiguredIntegrationEventVersions(),
           },
           {

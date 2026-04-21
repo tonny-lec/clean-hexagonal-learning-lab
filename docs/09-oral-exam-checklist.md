@@ -275,6 +275,8 @@
 **見たいポイント**
 - 運用観測と履歴証跡の違い
 - 同じログっぽく見えても目的が違うと説明できるか
+- telemetry event / audit entry / business event を混同しないか
+- requestId / traceId のような運用文脈を domain contract と分けて話せるか
 
 ---
 
@@ -294,6 +296,7 @@
 ### Q40. この repo を次に1段階進化させるなら何を追加しますか？ なぜですか？
 **見たいポイント**
 - structured logging / metrics / tracing
+- requestId / correlationId / trace context の導入
 - consumer group / durable consumer
 - payment workflow の saga 化
 - bounded context / ACL の整理

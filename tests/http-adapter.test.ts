@@ -12,6 +12,7 @@ describe('HTTP adapters', () => {
           'x-actor-id': 'customer-1-user',
           'x-actor-role': 'customer',
           'x-customer-id': 'customer-1',
+          'x-request-id': 'request-123',
         },
         body: JSON.stringify({
           customerId: 'customer-1',
@@ -27,6 +28,12 @@ describe('HTTP adapters', () => {
           actorId: 'customer-1-user',
           role: 'customer',
           customerId: 'customer-1',
+        });
+        expect(command.telemetry).toEqual({
+          source: 'http',
+          requestId: 'request-123',
+          correlationId: 'request-123',
+          traceId: 'trace-request-123',
         });
 
         return {
