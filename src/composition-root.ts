@@ -8,6 +8,8 @@ import { ConsolePaymentGateway } from './adapters/console/console-payment-gatewa
 import { ConsoleFulfillmentService } from './adapters/fulfillment/console-fulfillment-service.js';
 import { FakeFulfillmentService } from './adapters/fulfillment/fake-fulfillment-service.js';
 import { FailingFulfillmentService } from './adapters/fulfillment/failing-fulfillment-service.js';
+import { FakeWarehouseClient } from './adapters/fulfillment/fake-warehouse-client.js';
+import { WarehouseAclFulfillmentService } from './adapters/fulfillment/warehouse-acl-fulfillment-service.js';
 import { InMemoryDeliveryTriggerConsumer } from './adapters/in-memory/in-memory-delivery-trigger-consumer.js';
 import { InMemoryOrderReadModel } from './adapters/in-memory/in-memory-order-read-model.js';
 import { InMemoryOrderRepository } from './adapters/in-memory/in-memory-order-repository.js';
@@ -53,6 +55,12 @@ function createFulfillmentService() {
 
   if (mode === 'failing') {
     return new FailingFulfillmentService('Configured fulfillment service failure.');
+  }
+
+  if (mode === 'warehouse-acl') {
+    return new WarehouseAclFulfillmentService({
+      client: new FakeWarehouseClient(),
+    });
   }
 
   return new ConsoleFulfillmentService();
